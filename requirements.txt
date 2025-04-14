@@ -1,0 +1,4 @@
+# Python dependencies for pskreporter-ha-bridge script
+paho-mqtt>=2.0.0
+pyhamtools>=0.11.0
+websockets
