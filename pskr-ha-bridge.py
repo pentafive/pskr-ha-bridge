@@ -70,7 +70,7 @@ HA_ENTITY_BASE = "pskr"                 # Base prefix for script's entity IDs an
 # ==============================================================================
 # --- Other Global Variables & Constants ---
 # ==============================================================================
-SCRIPT_VERSION = "1.4.7" # Version with consolidated stats, new sensors, fixes, hardcoded config
+SCRIPT_VERSION = "1.4.8" # Version update: Fix stats task errors, use transport="tcp"
 MAX_SPOT_HISTORY = 5000
 
 # --- State Variables ---
@@ -78,74 +78,48 @@ spot_session_stats = {}
 all_spots_history = deque(maxlen=MAX_SPOT_HISTORY)
 
 # --- Initialization for PyHamtools Lookups ---
-lookuplib = None
-callinfo = None
-pyhamtools_lookups_ok = False
+# (Initialization code remains the same)
+lookuplib = None; callinfo = None; pyhamtools_lookups_ok = False
 try:
-    print("INFO: Initializing pyhamtools LookupLib...")
-    lookuplib = LookupLib(lookuptype="countryfile")
-    print("INFO: Initializing pyhamtools Callinfo...")
-    callinfo = Callinfo(lookuplib)
-    print("INFO: PyHamtools lookups initialized.")
-    pyhamtools_lookups_ok = True
-except Exception as e:
-    print(f"WARNING: Failed to initialize pyhamtools lookup libraries: {e}")
-    print("WARNING: Country/Continent enrichment will be disabled.")
+    print("INFO: Initializing pyhamtools LookupLib..."); lookuplib = LookupLib(lookuptype="countryfile")
+    print("INFO: Initializing pyhamtools Callinfo..."); callinfo = Callinfo(lookuplib)
+    print("INFO: PyHamtools lookups initialized."); pyhamtools_lookups_ok = True
+except Exception as e: print(f"WARNING: Failed lookup init: {e}. Enrichment disabled.")
 
 
-# --- Helper Functions ---
-
+# --- Helper Functions --- (Unchanged from v1.4.7)
 def sanitize_for_mqtt(input_string):
     if not isinstance(input_string, str): return ""
     safe_str = input_string.replace('.', '-').replace('/', '-').replace('#', '-').replace('+', '-')
     safe_str = ''.join(c for c in safe_str if c.isalnum() or c in ['-', '_'])
     return safe_str.lower()
 
-SAFE_MY_CALLSIGN = sanitize_for_mqtt(MY_CALLSIGN) if MY_CALLSIGN else "" # Handle potential None before sanitize
-ALLOW_CALLS_UPPER = {c.upper() for c in SPOT_ALLOW_CALLSIGNS}
-FILTERED_CALLS_UPPER = {c.upper() for c in SPOT_FILTERED_CALLSIGNS}
-ALLOW_COUNTRIES_SET = set(SPOT_ALLOW_COUNTRIES)
-FILTERED_COUNTRIES_SET = set(SPOT_FILTERED_COUNTRIES)
+SAFE_MY_CALLSIGN = sanitize_for_mqtt(MY_CALLSIGN) if MY_CALLSIGN else ""
+ALLOW_CALLS_UPPER = {c.upper() for c in SPOT_ALLOW_CALLSIGNS}; FILTERED_CALLS_UPPER = {c.upper() for c in SPOT_FILTERED_CALLSIGNS}
+ALLOW_COUNTRIES_SET = set(SPOT_ALLOW_COUNTRIES); FILTERED_COUNTRIES_SET = set(SPOT_FILTERED_COUNTRIES)
 
 def get_base_callsign(full_callsign):
     if not full_callsign or not isinstance(full_callsign, str): return None
-    call = full_callsign.replace('.', '/')
-    parts = call.split('/')
+    call = full_callsign.replace('.', '/'); parts = call.split('/')
     if len(parts) == 1: return call
-    # Check last part first for PREFIX/CALL format
-    if re.search(r'\d', parts[-1]) and len(parts[-1]) > 2: # Basic check if last part looks like a call
+    if re.search(r'\d', parts[-1]) and len(parts[-1]) > 2:
          if len(parts) == 2 and re.fullmatch(r'[A-Z0-9]+', parts[0]): return parts[-1]
-    # Otherwise assume CALL/SUFFIX or just return first part
     return parts[0]
 
-# Define Device configurations dynamically based on MY_CALLSIGN
 DEVICE_NAME_SPOTS = f"PSKr Spots ({MY_CALLSIGN})" if MY_CALLSIGN else "PSKr Spots"
 DEVICE_UNIQUE_ID_SPOTS = f"{HA_ENTITY_BASE}_spots_{SAFE_MY_CALLSIGN}" if SAFE_MY_CALLSIGN else f"{HA_ENTITY_BASE}_spots"
-
 DEVICE_NAME_STATS_RX = f"PSKr Stats RX ({MY_CALLSIGN})" if MY_CALLSIGN else "PSKr Stats RX"
 DEVICE_UNIQUE_ID_STATS_RX = f"{HA_ENTITY_BASE}_stats_rx_{SAFE_MY_CALLSIGN}" if SAFE_MY_CALLSIGN else f"{HA_ENTITY_BASE}_stats_rx"
-
 DEVICE_NAME_STATS_TX = f"PSKr Stats TX ({MY_CALLSIGN})" if MY_CALLSIGN else "PSKr Stats TX"
 DEVICE_UNIQUE_ID_STATS_TX = f"{HA_ENTITY_BASE}_stats_tx_{SAFE_MY_CALLSIGN}" if SAFE_MY_CALLSIGN else f"{HA_ENTITY_BASE}_stats_tx"
 
 def get_spot_device_config():
-    return { "identifiers": [DEVICE_UNIQUE_ID_SPOTS], "name": DEVICE_NAME_SPOTS,
-             "manufacturer": "PSKReporter.info / Python Script", "model": "MQTT Spot Listener",
-             "sw_version": SCRIPT_VERSION }
-
+    return { "identifiers": [DEVICE_UNIQUE_ID_SPOTS], "name": DEVICE_NAME_SPOTS, "manufacturer": "PSKReporter.info / Python Script", "model": "MQTT Spot Listener", "sw_version": SCRIPT_VERSION }
 def get_stats_device_config(direction):
     direction_clean = direction.lower()
-    if direction_clean == "rx":
-        return { "identifiers": [DEVICE_UNIQUE_ID_STATS_RX], "name": DEVICE_NAME_STATS_RX,
-                 "manufacturer": "PSKReporter.info / Python Script", "model": "MQTT Statistics Aggregator",
-                 "sw_version": SCRIPT_VERSION }
-    elif direction_clean == "tx":
-        return { "identifiers": [DEVICE_UNIQUE_ID_STATS_TX], "name": DEVICE_NAME_STATS_TX,
-                 "manufacturer": "PSKReporter.info / Python Script", "model": "MQTT Statistics Aggregator",
-                 "sw_version": SCRIPT_VERSION }
-    else:
-        print(f"WARNING: Invalid direction '{direction}' requested for stats device config. Defaulting to RX.")
-        return get_stats_device_config("rx")
+    if direction_clean == "rx": return { "identifiers": [DEVICE_UNIQUE_ID_STATS_RX], "name": DEVICE_NAME_STATS_RX, "manufacturer": "PSKReporter.info / Python Script", "model": "MQTT Statistics Aggregator", "sw_version": SCRIPT_VERSION }
+    elif direction_clean == "tx": return { "identifiers": [DEVICE_UNIQUE_ID_STATS_TX], "name": DEVICE_NAME_STATS_TX, "manufacturer": "PSKReporter.info / Python Script", "model": "MQTT Statistics Aggregator", "sw_version": SCRIPT_VERSION }
+    else: print(f"WARNING: Invalid direction '{direction}'. Defaulting to RX stats device."); return get_stats_device_config("rx")
 
 def km_to_miles(km): km_val = km if isinstance(km, (int, float)) else 0; return km_val * 0.621371
 def safe_mean(data): numeric_data = [x for x in data if isinstance(x, (int, float))]; return statistics.mean(numeric_data) if numeric_data else 0.0
@@ -167,8 +141,7 @@ def publish_mqtt(client, topic, payload, retain=False, qos=0):
         else: print(f"ERROR: Failed to publish to {topic}. Result code: {result}"); return False
     except Exception as e: print(f"ERROR: Unexpected error publishing to {topic}: {e}"); return False
 
-# --- Discovery Publishing Functions ---
-
+# --- Discovery Publishing Functions --- (Unchanged from v1.4.7)
 def publish_spot_discovery(client, sender_call, receiver_call):
     safe_sender = sanitize_for_mqtt(sender_call); safe_receiver = sanitize_for_mqtt(receiver_call)
     if not safe_sender or not safe_receiver: return
@@ -184,8 +157,7 @@ def publish_spot_discovery(client, sender_call, receiver_call):
 
 def publish_stat_discovery(client, direction, metric, unit="", icon="", state_class=None, device_class=None, band=None, signal_mode=None, extra_attrs=None):
     if not isinstance(metric, str): print(f"ERROR: Invalid metric type '{type(metric)}' for discovery. Skipping."); return
-    if not SAFE_MY_CALLSIGN: print("ERROR: Cannot publish stat discovery, MY_CALLSIGN not set."); return # Need callsign for ID
-
+    if not SAFE_MY_CALLSIGN: print("ERROR: Cannot publish stat discovery, MY_CALLSIGN not set."); return
     safe_band = sanitize_for_mqtt(band) if band else None
     safe_mode = sanitize_for_mqtt(signal_mode) if signal_mode else None
     safe_metric = sanitize_for_mqtt(metric)
@@ -206,7 +178,7 @@ def publish_stat_discovery(client, direction, metric, unit="", icon="", state_cl
     elif metric == "min_dist": metric_name_pretty = "Min Dist"
     elif metric == "max_dist": metric_name_pretty = "Max Dist"
 
-    name_parts.append(f"{metric_name_pretty}") # No interval suffix
+    name_parts.append(f"{metric_name_pretty}")
     id_parts.append(safe_metric)
     topic_parts.append(safe_metric)
 
@@ -215,13 +187,11 @@ def publish_stat_discovery(client, direction, metric, unit="", icon="", state_cl
     name = " ".join(name_parts)
     config_topic = f"{HA_DISCOVERY_PREFIX}/sensor/{unique_id}/config"
 
-    payload = { "name": name, "state_topic": f"{base_topic}/state", "unique_id": unique_id,
-                "device": get_stats_device_config(direction) }
+    payload = { "name": name, "state_topic": f"{base_topic}/state", "unique_id": unique_id, "device": get_stats_device_config(direction) }
     if unit: payload["unit_of_measurement"] = unit
     if icon: payload["icon"] = icon
     if state_class: payload["state_class"] = state_class
     if device_class: payload["device_class"] = device_class
-
     payload["attributes"] = { "direction": direction.upper(), "metric": metric, "measurement_period_minutes": period_minutes }
     if band: payload["attributes"]["band"] = band
     if signal_mode: payload["attributes"]["signal_mode"] = signal_mode
@@ -231,7 +201,7 @@ def publish_stat_discovery(client, direction, metric, unit="", icon="", state_cl
     publish_mqtt(client, config_topic, json.dumps(payload), retain=True, qos=0)
 
 def publish_most_active_discovery(client, direction, metric_type):
-    if not SAFE_MY_CALLSIGN: return # Need callsign for ID
+    if not SAFE_MY_CALLSIGN: return
     metric = f"most_active_{metric_type}"
     safe_metric = sanitize_for_mqtt(metric)
     unique_id = f"{HA_ENTITY_BASE}_stats_{direction}_{SAFE_MY_CALLSIGN}_{safe_metric}"
@@ -243,8 +213,7 @@ def publish_most_active_discovery(client, direction, metric_type):
     icon = "mdi:chart-bar" if metric_type == "band" else "mdi:waveform"
 
     payload = { "name": name, "state_topic": f"{base_topic}/state", "unique_id": unique_id, "icon": icon,
-                "json_attributes_topic": attributes_topic,
-                "device": get_stats_device_config(direction),
+                "json_attributes_topic": attributes_topic, "device": get_stats_device_config(direction),
                 "attributes": { "direction": direction.upper(), "metric": metric, "measurement_period_minutes": period_minutes } }
     if DEBUG_MODE: print(f"DEBUG: Publishing Most Active Discovery for {name} (ID: {unique_id})")
     publish_mqtt(client, config_topic, json.dumps(payload), retain=True, qos=0)
@@ -253,7 +222,6 @@ def publish_global_country_discovery(client, direction):
     publish_stat_discovery(client=client, direction=direction, metric="total_unique_countries",
                            unit="countries", icon="mdi:map-marker-multiple", state_class="measurement")
 
-
 # --- State Update Publishing Functions ---
 def publish_spot_update(client, sender_call, receiver_call, current_snr, attributes_payload):
     safe_sender = sanitize_for_mqtt(sender_call); safe_receiver = sanitize_for_mqtt(receiver_call)
@@ -261,7 +229,7 @@ def publish_spot_update(client, sender_call, receiver_call, current_snr, attribu
     base_topic = f"{HA_ENTITY_BASE}/spots/{safe_sender}/{safe_receiver}"
     state_topic = f"{base_topic}/state"; attributes_topic = f"{base_topic}/attributes"
     if DEBUG_MODE: print(f"DEBUG: Updating spot state for {sender_call}->{receiver_call}: {current_snr}")
-    publish_mqtt(client, state_topic, current_snr, qos=1) # QoS 1 for state
+    publish_mqtt(client, state_topic, current_snr, qos=1)
     try:
         attributes_payload_clean = {k: v for k, v in attributes_payload.items() if v is not None}
         json_attributes = json.dumps(attributes_payload_clean)
@@ -270,6 +238,7 @@ def publish_spot_update(client, sender_call, receiver_call, current_snr, attribu
     except Exception as e: print(f"ERROR: publishing spot attributes for {sender_call}->{receiver_call}: {e}")
 
 def publish_stat_update(client, direction, metric, value, band=None, signal_mode=None):
+    """Publishes state update for various statistics sensors. Uses keywords for safety."""
     safe_band = sanitize_for_mqtt(band) if band else None
     safe_mode = sanitize_for_mqtt(signal_mode) if signal_mode else None
     safe_metric = sanitize_for_mqtt(metric)
@@ -283,7 +252,7 @@ def publish_stat_update(client, direction, metric, value, band=None, signal_mode
     publish_mqtt(client, state_topic, value if value is not None else 0, qos=0)
 
 def publish_most_active_sensor(client, direction, metric_type, state_value, count_value):
-    if not SAFE_MY_CALLSIGN: return # Need callsign for topic
+    if not SAFE_MY_CALLSIGN: return
     metric = f"most_active_{metric_type}"
     safe_metric = sanitize_for_mqtt(metric)
     base_topic = f"{HA_ENTITY_BASE}/stats/{direction}/{SAFE_MY_CALLSIGN}/{safe_metric}"
@@ -296,7 +265,6 @@ def publish_most_active_sensor(client, direction, metric_type, state_value, coun
     publish_mqtt(client, state_topic, state_to_publish, qos=0)
     publish_mqtt(client, attributes_topic, json.dumps(attributes_payload), qos=0)
 
-
 # --- Periodic Stats Calculation Task ---
 state_lock = threading.Lock()
 stats_timer = None
@@ -306,7 +274,7 @@ def update_band_stats_task():
     """Calculates and publishes interval-based stats. Runs periodically."""
     global stats_timer
     if stop_event.is_set(): return
-    if not SAFE_MY_CALLSIGN: print("ERROR: Cannot run stats update without MY_CALLSIGN set."); return # Safety check
+    if not SAFE_MY_CALLSIGN: print("ERROR: Cannot run stats update without MY_CALLSIGN set."); return
 
     current_time = time.time()
     interval_cutoff_time = current_time - STATS_INTERVAL_WINDOW_SECONDS
@@ -323,21 +291,14 @@ def update_band_stats_task():
     if not directions_to_process: print("ERROR: Invalid SCRIPT_DIRECTION."); return
 
     for direction in directions_to_process:
-        if direction == "rx":
-            dir_spots_interval = [s for s in spots_in_interval if s[5] == MY_CALLSIGN]
-            adif_idx, station_idx = 7, 4; unique_station_metric = "unique_senders"
-        else: # tx
-            dir_spots_interval = [s for s in spots_in_interval if s[4] == MY_CALLSIGN]
-            adif_idx, station_idx = 8, 5; unique_station_metric = "unique_receivers"
-
+        if direction == "rx": dir_spots_interval = [s for s in spots_in_interval if s[5] == MY_CALLSIGN]; adif_idx, station_idx = 7, 4; unique_station_metric = "unique_senders"
+        else: dir_spots_interval = [s for s in spots_in_interval if s[4] == MY_CALLSIGN]; adif_idx, station_idx = 8, 5; unique_station_metric = "unique_receivers"
         if DEBUG_MODE: print(f"DEBUG: [{direction.upper()}] Processing {len(dir_spots_interval)} spots for this direction.")
 
         # Aggregators
         agg_band_mode = defaultdict(lambda: defaultdict(lambda: {'distances': [], 'snrs': [], 'stations': set()}))
-        agg_band_mode_counts = defaultdict(lambda: defaultdict(int))
-        band_adif_codes = defaultdict(set); global_stations_per_mode = defaultdict(set)
-        global_counts_per_mode = defaultdict(int); global_adif_codes = set()
-        global_stations = set(); global_distances = []; global_snrs = []
+        agg_band_mode_counts = defaultdict(lambda: defaultdict(int)); band_adif_codes = defaultdict(set); global_stations_per_mode = defaultdict(set)
+        global_counts_per_mode = defaultdict(int); global_adif_codes = set(); global_stations = set(); global_distances = []; global_snrs = []
 
         # Aggregate data
         for ts, band, dist, snr, sender, receiver, mode, s_adif, r_adif in dir_spots_interval:
@@ -361,14 +322,15 @@ def update_band_stats_task():
              for mode, count in band_data.items(): global_counts_per_mode[mode] += count
         most_active_mode = max(global_counts_per_mode, key=global_counts_per_mode.get) if global_counts_per_mode else None; most_active_mode_count = global_counts_per_mode.get(most_active_mode, 0)
 
-        # Publish Global Stats
+        # --- Publish Global Stats ---
         if ha_client.is_connected():
-            publish_global_country_discovery(ha_client, direction); time.sleep(0.05)
+            # Publish discovery first (includes small delay within functions now)
+            publish_global_country_discovery(ha_client, direction)
             publish_stat_discovery(ha_client, direction=direction, metric="total_spots", unit="spots", icon="mdi:counter", state_class="measurement"); time.sleep(0.05)
             publish_stat_discovery(ha_client, direction=direction, metric=f"total_{unique_station_metric}", unit="stations", icon="mdi:account-multiple", state_class="measurement"); time.sleep(0.05)
-            publish_stat_discovery(ha_client, direction=direction, metric="total_min_dist", unit="km", icon="mdi:map-marker-distance", state_class="measurement", device_class="distance"); time.sleep(0.05)
+            publish_stat_discovery(ha_client, direction=direction, metric="total_min_dist", unit="km", icon="mdi:arrow-collapse-right", state_class="measurement", device_class="distance"); time.sleep(0.05)
             publish_stat_discovery(ha_client, direction=direction, metric="total_avg_dist", unit="km", icon="mdi:map-marker-distance", state_class="measurement", device_class="distance"); time.sleep(0.05)
-            publish_stat_discovery(ha_client, direction=direction, metric="total_max_dist", unit="km", icon="mdi:map-marker-distance", state_class="measurement", device_class="distance"); time.sleep(0.05)
+            publish_stat_discovery(ha_client, direction=direction, metric="total_max_dist", unit="km", icon="mdi:arrow-expand-left", state_class="measurement", device_class="distance"); time.sleep(0.05)
             publish_stat_discovery(ha_client, direction=direction, metric="total_min_snr", unit="dB", icon="mdi:signal-cellular-1", state_class="measurement", device_class="signal_strength"); time.sleep(0.05)
             publish_stat_discovery(ha_client, direction=direction, metric="total_avg_snr", unit="dB", icon="mdi:signal", state_class="measurement", device_class="signal_strength"); time.sleep(0.05)
             publish_stat_discovery(ha_client, direction=direction, metric="total_max_snr", unit="dB", icon="mdi:signal-cellular-3", state_class="measurement", device_class="signal_strength"); time.sleep(0.05)
@@ -380,6 +342,7 @@ def update_band_stats_task():
                 publish_stat_discovery(ha_client, direction=direction, metric="count", unit="spots", icon="mdi:counter", state_class="measurement", signal_mode=mode); time.sleep(0.05)
                 publish_stat_discovery(ha_client, direction=direction, metric=unique_station_metric, unit="stations", icon="mdi:account-multiple", state_class="measurement", signal_mode=mode); time.sleep(0.05)
 
+            # Publish updates for globals
             publish_stat_update(ha_client, direction=direction, metric="total_unique_countries", value=global_total_unique_countries)
             publish_stat_update(ha_client, direction=direction, metric="total_spots", value=global_total_spots)
             publish_stat_update(ha_client, direction=direction, metric=f"total_{unique_station_metric}", value=global_total_unique_stations)
@@ -431,7 +394,6 @@ def update_band_stats_task():
         stats_timer = threading.Timer(STATS_UPDATE_INTERVAL_SECONDS, update_band_stats_task)
         stats_timer.daemon = True; stats_timer.start()
 
-
 # --- MQTT Callbacks ---
 def on_connect_psk(client, userdata, flags, rc, properties=None):
     if rc == 0:
@@ -479,45 +441,35 @@ def on_message_psk(client, userdata, msg):
     try:
         payload_str = msg.payload.decode("utf-8")
         data = json.loads(payload_str)
-
         sender_call_orig = data.get("sc"); receiver_call_orig = data.get("rc")
         raw_sender_loc = data.get("sl"); raw_receiver_loc = data.get("rl")
         snr = data.get("rp"); timestamp_unix = data.get("t"); frequency = data.get("f")
         band = data.get("b"); signal_mode = data.get("md")
         sender_adif = data.get("sa"); receiver_adif = data.get("ra")
-
         if not all([sender_call_orig, receiver_call_orig, raw_sender_loc, isinstance(snr, (int, float)), timestamp_unix, band, signal_mode]): return
-
         is_rx_spot = (receiver_call_orig == MY_CALLSIGN); is_tx_spot = (sender_call_orig == MY_CALLSIGN)
         if SCRIPT_DIRECTION.lower() == "rx" and not is_rx_spot: return
         if SCRIPT_DIRECTION.lower() == "tx" and not is_tx_spot: return
         if SCRIPT_DIRECTION.lower() != "dual" and not is_rx_spot and not is_tx_spot: return
 
-        # Perform Geo Calcs & Lookups
+        # Geo Calcs & Lookups
         dist_km, bearing = None, None
-        sender_loc_for_calc = raw_sender_loc[:6] if raw_sender_loc else None
-        receiver_loc_for_calc = raw_receiver_loc[:6] if raw_receiver_loc else None
-        my_loc_in_message = receiver_loc_for_calc if is_rx_spot else sender_loc_for_calc
-        other_loc_in_message = sender_loc_for_calc if is_rx_spot else receiver_loc_for_calc
+        sender_loc_for_calc = raw_sender_loc[:6] if raw_sender_loc else None; receiver_loc_for_calc = raw_receiver_loc[:6] if raw_receiver_loc else None
+        my_loc_in_message = receiver_loc_for_calc if is_rx_spot else sender_loc_for_calc; other_loc_in_message = sender_loc_for_calc if is_rx_spot else receiver_loc_for_calc
         if my_loc_in_message and other_loc_in_message and len(my_loc_in_message) >= 4 and len(other_loc_in_message) >= 4:
             try:
-                dist_km = calculate_distance(my_loc_in_message, other_loc_in_message)
-                bearing = calculate_heading(my_loc_in_message, other_loc_in_message)
-            except Exception: pass # Ignore geo errors
-
+                dist_km = calculate_distance(my_loc_in_message, other_loc_in_message); bearing = calculate_heading(my_loc_in_message, other_loc_in_message)
+            except Exception: pass
         sender_lat, sender_lon, receiver_lat, receiver_lon = None, None, None, None
-        sender_loc_for_latlon = raw_sender_loc[:8] if raw_sender_loc else None
-        receiver_loc_for_latlon = raw_receiver_loc[:8] if raw_receiver_loc else None
+        sender_loc_for_latlon = raw_sender_loc[:8] if raw_sender_loc else None; receiver_loc_for_latlon = raw_receiver_loc[:8] if raw_receiver_loc else None
         try:
             if sender_loc_for_latlon: sender_lat, sender_lon = locator_to_latlong(sender_loc_for_latlon)
         except Exception: pass
         try:
             if receiver_loc_for_latlon: receiver_lat, receiver_lon = locator_to_latlong(receiver_loc_for_latlon)
         except Exception: pass
-
         sender_country, sender_continent, receiver_country, receiver_continent = None, None, None, None
-        base_sender_call = get_base_callsign(sender_call_orig)
-        base_receiver_call = get_base_callsign(receiver_call_orig)
+        base_sender_call = get_base_callsign(sender_call_orig); base_receiver_call = get_base_callsign(receiver_call_orig)
         callinfo_local = userdata.get('callinfo') if userdata else callinfo
         if pyhamtools_lookups_ok and callinfo_local:
             if base_sender_call:
@@ -533,9 +485,7 @@ def on_message_psk(client, userdata, msg):
 
         # Update History (Always)
         with state_lock:
-            all_spots_history.append((
-                timestamp_unix, band, dist_km, snr, sender_call_orig, receiver_call_orig,
-                signal_mode, sender_adif, receiver_adif ))
+            all_spots_history.append(( timestamp_unix, band, dist_km, snr, sender_call_orig, receiver_call_orig, signal_mode, sender_adif, receiver_adif ))
 
         # Apply Spot Sensor Filtering
         allow_spot_sensor = True
@@ -551,56 +501,32 @@ def on_message_psk(client, userdata, msg):
                 if not (sender_call_orig.upper() in ALLOW_CALLS_UPPER or receiver_call_orig.upper() in ALLOW_CALLS_UPPER): allow_spot_sensor = False
             if allow_spot_sensor and SPOT_ALLOW_COUNTRIES:
                  if not (sender_adif in ALLOW_COUNTRIES_SET or receiver_adif in ALLOW_COUNTRIES_SET): allow_spot_sensor = False
-
         if DEBUG_MODE: print(f"DEBUG: Spot {sender_call_orig}->{receiver_call_orig}: Filter decision = {allow_spot_sensor}")
 
         # Update/Publish Spot Sensor (Only if Allowed)
         if allow_spot_sensor:
-            needs_discovery = False
-            session_data_for_publish = {}
+            needs_discovery = False; session_data_for_publish = {}
             with state_lock:
                 spot_key = f"{sender_call_orig}->{receiver_call_orig}"
                 if spot_key not in spot_session_stats:
-                    spot_session_stats[spot_key] = { 'sender': sender_call_orig, 'receiver': receiver_call_orig, 'snrs': [],
-                                                     'timestamps': [], 'first_seen': timestamp_unix, 'last_seen': timestamp_unix,
-                                                     'count': 0, 'config_published': False }
-                    needs_discovery = True
-                session = spot_session_stats[spot_key]
-                session['snrs'].append(snr); session['timestamps'].append(timestamp_unix)
-                session['last_seen'] = timestamp_unix; session['count'] += 1
-                session['sender_loc'] = raw_sender_loc; session['receiver_loc'] = raw_receiver_loc
-                session_data_for_publish = { 'snrs': list(session['snrs']), 'count': session.get('count', 0),
-                                             'first_seen': session.get('first_seen'), 'last_seen': session.get('last_seen') }
-
+                    spot_session_stats[spot_key] = { 'sender': sender_call_orig, 'receiver': receiver_call_orig, 'snrs': [], 'timestamps': [], 'first_seen': timestamp_unix, 'last_seen': timestamp_unix, 'count': 0, 'config_published': False }; needs_discovery = True
+                session = spot_session_stats[spot_key]; session['snrs'].append(snr); session['timestamps'].append(timestamp_unix); session['last_seen'] = timestamp_unix; session['count'] += 1; session['sender_loc'] = raw_sender_loc; session['receiver_loc'] = raw_receiver_loc
+                session_data_for_publish = { 'snrs': list(session['snrs']), 'count': session.get('count', 0), 'first_seen': session.get('first_seen'), 'last_seen': session.get('last_seen') }
             if ha_client.is_connected():
-                if needs_discovery:
-                    publish_spot_discovery(ha_client, sender_call_orig, receiver_call_orig)
-                    time.sleep(0.5) # Delay after discovery
-
-                avg_snr = round(safe_mean(session_data_for_publish['snrs']), 1)
-                min_snr = safe_min(session_data_for_publish['snrs']); max_snr = safe_max(session_data_for_publish['snrs'])
-                dist_miles = round(km_to_miles(dist_km), 1) if dist_km is not None else None
-
+                if needs_discovery: publish_spot_discovery(ha_client, sender_call_orig, receiver_call_orig); time.sleep(0.5)
+                avg_snr = round(safe_mean(session_data_for_publish['snrs']), 1); min_snr = safe_min(session_data_for_publish['snrs']); max_snr = safe_max(session_data_for_publish['snrs']); dist_miles = round(km_to_miles(dist_km), 1) if dist_km is not None else None
                 attributes_payload = {
-                    "sender_callsign": sender_call_orig, "receiver_callsign": receiver_call_orig,
-                    "sender_locator": raw_sender_loc, "receiver_locator": raw_receiver_loc,
-                    "sender_latitude": sender_lat, "sender_longitude": sender_lon,
-                    "receiver_latitude": receiver_lat, "receiver_longitude": receiver_lon,
-                    "sender_country": sender_country, "sender_continent": sender_continent,
-                    "receiver_country": receiver_country, "receiver_continent": receiver_continent,
-                    "frequency": frequency, "band": band, "mode": signal_mode,
-                    "distance_km": round(dist_km, 1) if dist_km is not None else None,
-                    "distance_miles": dist_miles,
-                    "bearing": round(bearing, 1) if bearing is not None else None,
-                    "session_spot_count": session_data_for_publish.get('count', 0),
+                    "sender_callsign": sender_call_orig, "receiver_callsign": receiver_call_orig, "sender_locator": raw_sender_loc, "receiver_locator": raw_receiver_loc,
+                    "sender_latitude": sender_lat, "sender_longitude": sender_lon, "receiver_latitude": receiver_lat, "receiver_longitude": receiver_lon,
+                    "sender_country": sender_country, "sender_continent": sender_continent, "receiver_country": receiver_country, "receiver_continent": receiver_continent,
+                    "frequency": frequency, "band": band, "mode": signal_mode, "distance_km": round(dist_km, 1) if dist_km is not None else None, "distance_miles": dist_miles,
+                    "bearing": round(bearing, 1) if bearing is not None else None, "session_spot_count": session_data_for_publish.get('count', 0),
                     "session_snr_avg": avg_snr, "session_snr_min": min_snr, "session_snr_max": max_snr,
                     "session_first_heard_utc": datetime.datetime.fromtimestamp(session_data_for_publish.get('first_seen', 0), tz=datetime.timezone.utc).isoformat() if session_data_for_publish.get('first_seen') else None,
                     "session_last_heard_utc": datetime.datetime.fromtimestamp(session_data_for_publish.get('last_seen', 0), tz=datetime.timezone.utc).isoformat() if session_data_for_publish.get('last_seen') else None,
-                    "script_last_updated": datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
-                }
+                    "script_last_updated": datetime.datetime.now(tz=datetime.timezone.utc).isoformat() }
                 attributes_payload_clean = {k: v for k, v in attributes_payload.items() if v is not None}
                 publish_spot_update(ha_client, sender_call_orig, receiver_call_orig, snr, attributes_payload_clean)
-
     except json.JSONDecodeError: print(f"ERROR: Could not decode JSON: {msg.payload.decode('utf-8', errors='ignore')}")
     except Exception as e: print(f"ERROR: An unexpected error occurred processing message: {e}"); traceback.print_exc()
 
@@ -622,24 +548,20 @@ if __name__ == "__main__":
         print(f"INFO: Spot Filter Min Distance (Km): {'Disabled' if SPOT_FILTER_MIN_DISTANCE_KM <= 0 else SPOT_FILTER_MIN_DISTANCE_KM}")
     print(f"INFO: Debug Mode Enabled: {DEBUG_MODE}")
 
-    # Determine Connection Parameters
-    psk_transport_protocol = None; psk_port = 1883; use_tls = False
+    psk_transport_protocol = "tcp"; psk_port = 1883; use_tls = False # Default to standard MQTT TCP
     mode = PSK_TRANSPORT_MODE.upper()
-    if mode == "MQTT": psk_port, psk_transport_protocol, use_tls = 1883, None, False
-    elif mode == "MQTT_TLS": psk_port, psk_transport_protocol, use_tls = 1884, None, True
+    if mode == "MQTT": psk_port, psk_transport_protocol, use_tls = 1883, "tcp", False
+    elif mode == "MQTT_TLS": psk_port, psk_transport_protocol, use_tls = 1884, "tcp", True
     elif mode == "MQTT_WS": psk_port, psk_transport_protocol, use_tls = 1885, "websockets", False
     elif mode == "MQTT_WS_TLS": psk_port, psk_transport_protocol, use_tls = 1886, "websockets", True
     else: print(f"FATAL: Invalid PSK_TRANSPORT_MODE '{PSK_TRANSPORT_MODE}'. Exiting."); sys.exit(1)
-
-    print(f"INFO: PSK Reporter Connection: Mode={mode}, Port={psk_port}, Transport={psk_transport_protocol if psk_transport_protocol else 'TCP'}, TLS={use_tls}")
+    print(f"INFO: PSK Reporter Connection: Mode={mode}, Port={psk_port}, Transport={psk_transport_protocol}, TLS={use_tls}")
     if psk_transport_protocol == "websockets": print("INFO: Ensure 'websockets' library is installed (`pip install websockets`)")
 
-    # Initialize Clients
     client_userdata = {'lookuplib': lookuplib, 'callinfo': callinfo} if pyhamtools_lookups_ok else None
     psk_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"ha_psk_listener_{MY_CALLSIGN}_{os.getpid()}", userdata=client_userdata, transport=psk_transport_protocol)
     psk_client.on_connect = on_connect_psk; psk_client.on_message = on_message_psk; psk_client.on_disconnect = on_disconnect
     psk_client.reconnect_delay_set(min_delay=5, max_delay=120)
-
     if use_tls:
         print("INFO: Configuring TLS for PSK Reporter connection.")
         try:
@@ -652,7 +574,6 @@ if __name__ == "__main__":
     if HA_MQTT_USER and HA_MQTT_PASS: ha_client.username_pw_set(HA_MQTT_USER, HA_MQTT_PASS); print("INFO: Using username/password for HA MQTT connection.")
     ha_client.reconnect_delay_set(min_delay=5, max_delay=120)
 
-    # Connect and Start Loop
     try:
         print(f"INFO: Attempting to connect to PSK Reporter Broker ({PSK_BROKER}:{psk_port})...")
         psk_client.connect(PSK_BROKER, psk_port, 60)
@@ -662,7 +583,6 @@ if __name__ == "__main__":
 
     psk_client.loop_start(); ha_client.loop_start()
 
-    # Initial Connection Wait
     print("INFO: Waiting for initial MQTT connections...")
     initial_connect_timeout = 30; start_wait = time.time()
     while time.time() - start_wait < initial_connect_timeout:
@@ -675,17 +595,15 @@ if __name__ == "__main__":
          if not ha_client.is_connected(): print(f"FATAL: Home Assistant client failed to connect.")
          stop_event.set(); sys.exit(1)
 
-    # Start Periodic Task
     print(f"INFO: Scheduling first stats update in {STATS_UPDATE_INTERVAL_SECONDS} seconds.")
     stats_timer = threading.Timer(STATS_UPDATE_INTERVAL_SECONDS, update_band_stats_task)
     stats_timer.daemon = True; stats_timer.start()
 
-    # Keep Running
     try:
         while not stop_event.is_set(): time.sleep(5)
     except KeyboardInterrupt: print("\nINFO: KeyboardInterrupt received. Shutting down gracefully...")
     except Exception as e: print(f"ERROR: An unexpected error occurred in main loop: {e}"); traceback.print_exc()
-    finally: # Cleanup
+    finally:
         print("INFO: Setting stop event for threads..."); stop_event.set()
         print("INFO: Stopping periodic timer...");
         if stats_timer and stats_timer.is_alive(): stats_timer.cancel()
