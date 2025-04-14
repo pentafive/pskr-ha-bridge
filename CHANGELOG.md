@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.7] - 2025-04-13
+
+### Added
+- New global statistics sensors (calculated over 15min interval):
+    - Total Spot Count (`..._total_spots`)
+    - Total Unique Stations (Senders/Receivers) (`..._total_unique_stations`)
+    - Min/Avg/Max Distance (`..._total_min_dist`, `..._total_avg_dist`, `..._total_max_dist`)
+    * Min/Avg/Max SNR (`..._total_min_snr`, `..._total_avg_snr`, `..._total_max_snr`)
+    * Active Band Count (`..._active_bands`)
+    * Most Active Band (State: Band Name, Attr: Count) (`..._most_active_band`)
+    * Most Active Mode (State: Mode Name, Attr: Count) (`..._most_active_mode`)
+    * Global Spot Count Per Mode (`..._mode_{mode}_count`)
+    * Global Unique Stations Per Mode (`..._mode_{mode}_unique_stations`)
+- `device_class` attribute (`distance`, `signal_strength`) added to relevant sensor discovery payloads for better HA integration.
+- Debug logging feature controlled by `DEBUG_MODE` flag.
+- More comments throughout the code for clarity.
+- Initial connection wait loop to ensure brokers are connected before proceeding.
+- `on_disconnect` handlers to log unexpected MQTT disconnections.
+
+### Changed
+- **Consolidated Statistics Interval:** All aggregate statistics sensors now calculate based *only* on the `STATS_INTERVAL_WINDOW_SECONDS` (default 15 minutes). Removed calculations based on the 1-hour window.
+- **Sensor Naming:** Removed "KM" and interval suffixes (e.g., "(15min)") from statistics sensor friendly names. Changed average distance metric ID from `avg_dist_km` to `avg_dist`.
+- **Spot Sensor State:** Set QoS to 1 for potentially more reliable initial state updates after discovery. Increased post-discovery delay to 0.5s.
+- **Code Structure:** Refactored statistics discovery publishing into a more generic `publish_stat_discovery` function. Refactored device config generation. Improved thread locking in `on_message_psk`.
+
+### Fixed
+- Corrected `pyhamtools` callsign lookup method to use `callinfo.get_all()`.
+- Fixed `NameError` for `publish_global_country_update` by replacing with correct call to `publish_stat_update`.
+- Fixed `AttributeError` potentially caused by incorrect positional arguments passed to `publish_stat_discovery` within the periodic stats task.
+
+---
+
 ## [1.4.6] - 2025-04-13
 
 Initial commit to GitHub. This version includes the core functionality for bridging PSKReporter data to Home Assistant with several configuration options and features developed during initial testing.
