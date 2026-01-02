@@ -1,0 +1,39 @@
+version: "3.8"
+
+services:
+  pskr-ha-bridge:
+    container_name: pskr-ha-bridge
+    build: .
+    restart: unless-stopped
+    environment:
+      # Core Identity (REQUIRED)
+      - MY_CALLSIGN=${MY_CALLSIGN}
+      # Debugging
+      - DEBUG_MODE=${DEBUG_MODE:-False}
+      # PSKReporter Broker
+      - PSK_BROKER=${PSK_BROKER:-mqtt.pskreporter.info}
+      - PSK_TRANSPORT_MODE=${PSK_TRANSPORT_MODE:-MQTT_WS_TLS}
+      - PSK_TLS_INSECURE=${PSK_TLS_INSECURE:-False}
+      # Home Assistant MQTT Broker (REQUIRED)
+      - HA_MQTT_BROKER=${HA_MQTT_BROKER}
+      - HA_MQTT_PORT=${HA_MQTT_PORT:-1883}
+      - HA_MQTT_USER=${HA_MQTT_USER:-}
+      - HA_MQTT_PASS=${HA_MQTT_PASS:-}
+      # Script Operation
+      - SCRIPT_DIRECTION=${SCRIPT_DIRECTION:-rx}
+      - MODES_FILTER=${MODES_FILTER:-+}
+      # Statistics Timing
+      - STATS_INTERVAL_WINDOW_SECONDS=${STATS_INTERVAL_WINDOW_SECONDS:-900}
+      - STATS_UPDATE_INTERVAL_SECONDS=${STATS_UPDATE_INTERVAL_SECONDS:-300}
+      # Spot Sensor Control
+      - ENABLE_SPOT_SENSORS=${ENABLE_SPOT_SENSORS:-True}
+      - SPOT_FILTER_MIN_DISTANCE_KM=${SPOT_FILTER_MIN_DISTANCE_KM:-0}
+      - SPOT_ALLOW_CALLSIGNS=${SPOT_ALLOW_CALLSIGNS:-}
+      - SPOT_FILTERED_CALLSIGNS=${SPOT_FILTERED_CALLSIGNS:-}
+      - SPOT_ALLOW_COUNTRIES=${SPOT_ALLOW_COUNTRIES:-}
+      - SPOT_FILTERED_COUNTRIES=${SPOT_FILTERED_COUNTRIES:-}
+      # Home Assistant Discovery
+      - HA_DISCOVERY_PREFIX=${HA_DISCOVERY_PREFIX:-homeassistant}
+      - HA_ENTITY_BASE=${HA_ENTITY_BASE:-pskr}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro

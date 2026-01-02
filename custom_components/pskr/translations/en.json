@@ -1,0 +1,119 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure PSKReporter HA Bridge",
+        "description": "Monitor amateur radio digital mode propagation from PSKReporter.info.\n\n**Personal Monitor:** Enter your callsign to track your spots.\n**Global Monitor:** Leave callsign empty to monitor network-wide activity.",
+        "data": {
+          "callsign": "Callsign (optional)",
+          "direction": "Monitoring Direction"
+        },
+        "data_description": {
+          "callsign": "Your amateur radio callsign (e.g., W1AW). Leave empty for global monitor.",
+          "direction": "Choose whether to monitor received spots, transmitted spots, or both"
+        }
+      }
+    },
+    "error": {
+      "invalid_callsign": "Invalid callsign format. Please enter a valid amateur radio callsign.",
+      "cannot_connect": "Unable to connect to PSKReporter.info"
+    },
+    "abort": {
+      "already_configured": "This callsign and direction combination is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "PSKReporter Options",
+        "description": "Configure filtering and performance options",
+        "data": {
+          "count_only": "Count-Only Mode",
+          "sample_rate": "Sample Rate",
+          "min_distance": "Minimum Distance (km)",
+          "max_distance": "Maximum Distance (km)",
+          "mode_filter": "Digital Modes Filter"
+        },
+        "data_description": {
+          "count_only": "Only count spots without storing details (reduces memory usage)",
+          "sample_rate": "Process 1 in N messages (higher = less CPU, 1 = all messages)",
+          "min_distance": "Only show spots beyond this distance (0 = no minimum)",
+          "max_distance": "Only show spots within this distance (0 = no maximum)",
+          "mode_filter": "Only show spots using these modes (empty = all modes)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "total_spots": {
+        "name": "Total Spots"
+      },
+      "unique_stations": {
+        "name": "Unique Stations"
+      },
+      "most_active_band": {
+        "name": "Most Active Band"
+      },
+      "most_active_mode": {
+        "name": "Most Active Mode"
+      },
+      "max_distance": {
+        "name": "Maximum Distance"
+      },
+      "avg_snr": {
+        "name": "Average SNR"
+      },
+      "spots_per_minute": {
+        "name": "Spots per Minute"
+      },
+      "last_spot": {
+        "name": "Last Spot Time"
+      },
+      "connection_status": {
+        "name": "Connection Status"
+      },
+      "feed_status": {
+        "name": "Feed Status"
+      },
+      "message_rate": {
+        "name": "Message Rate"
+      },
+      "feed_latency": {
+        "name": "Feed Latency"
+      },
+      "connection_uptime": {
+        "name": "Connection Uptime"
+      },
+      "reconnect_count": {
+        "name": "Reconnect Count"
+      },
+      "sequence_gaps": {
+        "name": "Sequence Gaps"
+      },
+      "parse_errors": {
+        "name": "Parse Errors"
+      },
+      "global_spots_sampled": {
+        "name": "Global Spots"
+      },
+      "global_unique_stations": {
+        "name": "Global Unique Stations"
+      },
+      "global_most_active_band": {
+        "name": "Most Active Band (Global)"
+      },
+      "global_most_active_mode": {
+        "name": "Most Active Mode (Global)"
+      },
+      "band_activity": {
+        "name": "{band} Activity"
+      }
+    },
+    "binary_sensor": {
+      "feed_health": {
+        "name": "Feed Health"
+      }
+    }
+  }
+}
