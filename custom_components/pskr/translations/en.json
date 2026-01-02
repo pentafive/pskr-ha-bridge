@@ -1,0 +1,74 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure PSKReporter Monitor",
+        "description": "Enter your amateur radio callsign to monitor spots from PSKReporter.info",
+        "data": {
+          "callsign": "Callsign",
+          "direction": "Monitoring Direction"
+        },
+        "data_description": {
+          "callsign": "Your amateur radio callsign (e.g., W1AW, VK2ABC/P)",
+          "direction": "Choose whether to monitor received spots, transmitted spots, or both"
+        }
+      }
+    },
+    "error": {
+      "invalid_callsign": "Invalid callsign format. Please enter a valid amateur radio callsign.",
+      "cannot_connect": "Unable to connect to PSKReporter.info"
+    },
+    "abort": {
+      "already_configured": "This callsign and direction combination is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "PSKReporter Options",
+        "description": "Configure filtering options for spot data",
+        "data": {
+          "min_distance": "Minimum Distance (km)",
+          "max_distance": "Maximum Distance (km)",
+          "mode_filter": "Digital Modes Filter"
+        },
+        "data_description": {
+          "min_distance": "Only show spots beyond this distance (0 = no minimum)",
+          "max_distance": "Only show spots within this distance (0 = no maximum)",
+          "mode_filter": "Only show spots using these modes (empty = all modes)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "total_spots": {
+        "name": "Total Spots"
+      },
+      "unique_stations": {
+        "name": "Unique Stations"
+      },
+      "most_active_band": {
+        "name": "Most Active Band"
+      },
+      "most_active_mode": {
+        "name": "Most Active Mode"
+      },
+      "max_distance": {
+        "name": "Maximum Distance"
+      },
+      "avg_snr": {
+        "name": "Average SNR"
+      },
+      "spots_per_minute": {
+        "name": "Spots per Minute"
+      },
+      "last_spot": {
+        "name": "Last Spot Time"
+      },
+      "connection_status": {
+        "name": "Connection Status"
+      }
+    }
+  }
+}

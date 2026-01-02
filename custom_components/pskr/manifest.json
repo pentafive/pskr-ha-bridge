@@ -1,0 +1,13 @@
+{
+  "domain": "pskr",
+  "name": "PSKReporter Monitor",
+  "codeowners": ["@pentafive"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/pentafive/pskr-ha-bridge",
+  "integration_type": "service",
+  "iot_class": "cloud_push",
+  "issue_tracker": "https://github.com/pentafive/pskr-ha-bridge/issues",
+  "requirements": ["paho-mqtt>=2.0.0", "pyhamtools>=0.11.0"],
+  "version": "2.0.0"
+}

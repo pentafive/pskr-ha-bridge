@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Runtime files
+*.log
+*.pid
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment (keep .env.example, ignore actual .env)
+.env
+.env.local
+config.local.py
+
+# Local-only directories (not published)
+Archives/
+Research/
+CLAUDE.md
+GEMINI.md
+
+# Claude Code
+.claude/

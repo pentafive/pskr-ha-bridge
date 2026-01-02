@@ -1,0 +1,42 @@
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+images/
+
+# Development
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+tests/
+.pytest_cache/
+.ruff_cache/
+
+# Local environment
+.env
+.env.local
+config.local.py
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local-only directories
+Archives/
+Research/
+CLAUDE.md
+GEMINI.md
+
+# HACS component (not needed for Docker)
+custom_components/
+hacs.json
+
+# Examples (not needed in container)
+examples/
