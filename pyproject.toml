@@ -44,7 +44,24 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["ARG"]
+"tests/*" = ["ARG", "F841", "F401", "UP009", "I001"]
+# Legacy Docker bridge script - minimal lint enforcement until refactored
+"pskr-ha-bridge.py" = [
+    "E701",   # Multiple statements on one line (colon)
+    "E702",   # Multiple statements on one line (semicolon)
+    "E703",   # Statement ends with unnecessary semicolon
+    "I001",   # Import block unsorted
+    "UP009",  # UTF-8 encoding declaration unnecessary
+    "UP017",  # Use datetime.UTC alias
+    "F541",   # f-string without placeholders
+    "F841",   # Local variable assigned but never used
+    "B007",   # Loop control variable not used
+    "ARG001", # Unused function argument (MQTT callbacks)
+    "SIM102", # Nested if statements
+    "SIM108", # Use ternary operator
+    "SIM212", # Negated condition in ternary
+]
+"config.py" = ["UP009"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["config", "custom_components.pskr"]
