@@ -119,24 +119,26 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         await self._async_start_mqtt()
         await super().async_config_entry_first_refresh()
 
+    def _setup_and_connect_mqtt(self) -> None:
+        """Set up and connect MQTT client (blocking, runs in executor)."""
+        self._mqtt_client = mqtt.Client(
+            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+            transport="websockets",
+        )
+        self._mqtt_client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
+        self._mqtt_client.ws_set_options(path="/")
+
+        self._mqtt_client.on_connect = self._on_connect
+        self._mqtt_client.on_disconnect = self._on_disconnect
+        self._mqtt_client.on_message = self._on_message
+
+        self._mqtt_client.connect(PSK_BROKER, PSK_PORT_WS_TLS)
+        self._mqtt_client.loop_start()
+
     async def _async_start_mqtt(self) -> None:
         """Start MQTT connection to PSKReporter."""
         try:
-            self._mqtt_client = mqtt.Client(
-                callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
-                transport="websockets",
-            )
-            self._mqtt_client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
-            self._mqtt_client.ws_set_options(path="/")
-
-            self._mqtt_client.on_connect = self._on_connect
-            self._mqtt_client.on_disconnect = self._on_disconnect
-            self._mqtt_client.on_message = self._on_message
-
-            await self.hass.async_add_executor_job(
-                self._mqtt_client.connect, PSK_BROKER, PSK_PORT_WS_TLS
-            )
-            self._mqtt_client.loop_start()
+            await self.hass.async_add_executor_job(self._setup_and_connect_mqtt)
             _LOGGER.info("Started MQTT connection to PSKReporter for %s", self._callsign)
         except Exception as err:
             _LOGGER.error("Failed to connect to PSKReporter: %s", err)
