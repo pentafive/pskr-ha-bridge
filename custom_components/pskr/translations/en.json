@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configure PSKReporter Monitor",
+        "title": "Configure PSKReporter HA Bridge",
         "description": "Enter your amateur radio callsign to monitor spots from PSKReporter.info",
         "data": {
           "callsign": "Callsign",

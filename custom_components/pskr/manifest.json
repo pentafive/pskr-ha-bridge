@@ -1,6 +1,6 @@
 {
   "domain": "pskr",
-  "name": "PSKReporter Monitor",
+  "name": "PSKReporter HA Bridge",
   "codeowners": ["@pentafive"],
   "config_flow": true,
   "dependencies": [],
