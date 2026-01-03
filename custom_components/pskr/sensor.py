@@ -1,4 +1,4 @@
-"""Sensor platform for PSKReporter Monitor."""
+"""Sensor platform for PSKReporter HA Bridge."""
 
 from __future__ import annotations
 
@@ -14,9 +14,9 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfLength
+from homeassistant.const import UnitOfLength, UnitOfTime
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -32,6 +32,7 @@ class PSKReporterSensorEntityDescription(SensorEntityDescription):
     attr_fn: Callable[[PSKReporterData], dict[str, Any]] | None = None
 
 
+# Main activity sensors
 SENSOR_DESCRIPTIONS: tuple[PSKReporterSensorEntityDescription, ...] = (
     PSKReporterSensorEntityDescription(
         key="total_spots",
@@ -65,7 +66,7 @@ SENSOR_DESCRIPTIONS: tuple[PSKReporterSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfLength.KILOMETERS,
         device_class=SensorDeviceClass.DISTANCE,
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda data: data.max_distance_km if data.max_distance_km > 0 else None,
+        value_fn=lambda data: round(data.max_distance_km, 1) if data.max_distance_km > 0 else None,
     ),
     PSKReporterSensorEntityDescription(
         key="avg_snr",
@@ -95,6 +96,98 @@ SENSOR_DESCRIPTIONS: tuple[PSKReporterSensorEntityDescription, ...] = (
         key="connection_status",
         translation_key="connection_status",
         value_fn=lambda data: "Connected" if data.connected else "Disconnected",
+        attr_fn=lambda data: {
+            "reconnect_count": data.health.reconnect_count,
+            "last_disconnect_reason": data.health.last_disconnect_reason,
+            "subscribed_topics": data.health.subscribed_topics,
+        },
+    ),
+)
+
+# Health monitoring sensors (diagnostic category)
+HEALTH_SENSOR_DESCRIPTIONS: tuple[PSKReporterSensorEntityDescription, ...] = (
+    PSKReporterSensorEntityDescription(
+        key="feed_status",
+        translation_key="feed_status",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: "Healthy" if data.health.feed_healthy else "Unhealthy",
+        attr_fn=lambda data: {
+            "last_message_time": (
+                datetime.fromtimestamp(data.health.last_message_time).isoformat()
+                if data.health.last_message_time > 0
+                else None
+            ),
+            "feed_latency_seconds": round(data.health.feed_latency, 1),
+            "threshold_seconds": 60,
+        },
+    ),
+    PSKReporterSensorEntityDescription(
+        key="message_rate",
+        translation_key="message_rate",
+        native_unit_of_measurement="msg/min",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.health.messages_last_minute,
+        attr_fn=lambda data: {
+            "total_messages": data.health.total_messages,
+        },
+    ),
+    PSKReporterSensorEntityDescription(
+        key="feed_latency",
+        translation_key="feed_latency",
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: round(data.health.feed_latency, 1) if data.health.last_message_time > 0 else None,
+    ),
+    PSKReporterSensorEntityDescription(
+        key="connection_uptime",
+        translation_key="connection_uptime",
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: round(data.health.connection_uptime, 0) if data.connected else 0,
+        attr_fn=lambda data: {
+            "connected_at": (
+                datetime.fromtimestamp(data.health.connected_at).isoformat()
+                if data.health.connected_at > 0
+                else None
+            ),
+        },
+    ),
+    PSKReporterSensorEntityDescription(
+        key="reconnect_count",
+        translation_key="reconnect_count",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.health.reconnect_count,
+        attr_fn=lambda data: {
+            "last_disconnect_reason": data.health.last_disconnect_reason or "N/A",
+        },
+    ),
+    PSKReporterSensorEntityDescription(
+        key="sequence_gaps",
+        translation_key="sequence_gaps",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.health.sequence_gaps,
+        attr_fn=lambda data: {
+            "total_gap_size": data.health.total_gap_size,
+            "description": "Number of detected message sequence gaps (missed messages)",
+        },
+    ),
+    PSKReporterSensorEntityDescription(
+        key="parse_errors",
+        translation_key="parse_errors",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.health.parse_errors,
+        attr_fn=lambda data: {
+            "incomplete_spots": data.health.incomplete_spots,
+            "description": "Messages that failed to parse",
+        },
     ),
 )
 
@@ -107,10 +200,17 @@ async def async_setup_entry(
     """Set up PSKReporter sensors based on a config entry."""
     coordinator: PSKReporterCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    async_add_entities(
-        PSKReporterSensor(coordinator, description)
-        for description in SENSOR_DESCRIPTIONS
-    )
+    entities: list[PSKReporterSensor] = []
+
+    # Add main sensors
+    for description in SENSOR_DESCRIPTIONS:
+        entities.append(PSKReporterSensor(coordinator, description))
+
+    # Add health sensors
+    for description in HEALTH_SENSOR_DESCRIPTIONS:
+        entities.append(PSKReporterSensor(coordinator, description))
+
+    async_add_entities(entities)
 
 
 class PSKReporterSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity):
@@ -137,7 +237,7 @@ class PSKReporterSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity)
             identifiers={(DOMAIN, f"{self.coordinator.callsign}_{self.coordinator.direction}")},
             name=f"PSKReporter - {self.coordinator.callsign}",
             manufacturer="PSKReporter.info",
-            model="PSKReporter Monitor",
+            model="PSKReporter HA Bridge",
             sw_version="2.0.0",
             configuration_url="https://pskreporter.info",
         )

@@ -1,4 +1,4 @@
-"""DataUpdateCoordinator for PSKReporter Monitor."""
+"""DataUpdateCoordinator for PSKReporter HA Bridge."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import json
 import logging
 import ssl
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any
@@ -38,6 +38,11 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# Health monitoring constants
+FEED_HEALTHY_THRESHOLD = 60  # seconds without messages = unhealthy
+MESSAGE_RATE_WINDOW = 60  # seconds for rate calculation
+SEQUENCE_GAP_THRESHOLD = 100  # report gaps larger than this
+
 
 @dataclass
 class SpotData:
@@ -54,6 +59,38 @@ class SpotData:
     distance_km: float = 0.0
     sender_dxcc: str = ""
     receiver_dxcc: str = ""
+    # New fields from MQTT payload
+    band: str = ""  # Direct from payload 'b' field
+    sender_azimuth: int = 0  # Bearing from sender to receiver
+    receiver_azimuth: int = 0  # Bearing from receiver to sender
+    sequence: int = 0  # Sequence number for gap detection
+
+
+@dataclass
+class HealthMetrics:
+    """Health monitoring metrics."""
+
+    # Connection health
+    connection_uptime: float = 0.0  # Seconds since connected
+    connected_at: float = 0.0  # Timestamp of connection
+    reconnect_count: int = 0  # Number of reconnections
+    last_disconnect_reason: str = ""
+
+    # Feed health
+    feed_healthy: bool = False  # Is data flowing?
+    last_message_time: float = 0.0  # When last message received
+    feed_latency: float = 0.0  # Seconds since last message
+    total_messages: int = 0  # Total messages since startup
+    messages_last_minute: int = 0  # Messages in last 60 seconds
+
+    # Data quality
+    sequence_gaps: int = 0  # Number of detected sequence gaps
+    total_gap_size: int = 0  # Total missed messages
+    parse_errors: int = 0  # Malformed message count
+    incomplete_spots: int = 0  # Messages missing required fields
+
+    # Subscription info
+    subscribed_topics: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -72,6 +109,8 @@ class PSKReporterData:
     mode_counts: dict[str, int] = field(default_factory=dict)
     last_spot_time: float = 0.0
     connected: bool = False
+    # Health metrics
+    health: HealthMetrics = field(default_factory=HealthMetrics)
 
 
 class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
@@ -101,6 +140,12 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         self._connected = False
         self._stats_window = DEFAULT_STATS_WINDOW
         self._spot_ttl = DEFAULT_SPOT_TTL
+
+        # Health tracking
+        self._health = HealthMetrics()
+        self._message_times: deque[float] = deque(maxlen=1000)  # Track recent message times
+        self._last_sequence: int | None = None  # For gap detection
+        self._startup_time = time.time()
 
         self.data = PSKReporterData()
 
@@ -156,6 +201,7 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         """Handle MQTT connection."""
         if reason_code == 0:
             self._connected = True
+            self._health.connected_at = time.time()
             _LOGGER.info("Connected to PSKReporter MQTT")
             self._subscribe_topics()
         else:
@@ -171,31 +217,35 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
     ) -> None:
         """Handle MQTT disconnection."""
         self._connected = False
+        self._health.reconnect_count += 1
+        self._health.last_disconnect_reason = str(reason_code)
         _LOGGER.warning("Disconnected from PSKReporter MQTT: %s", reason_code)
 
     def _subscribe_topics(self) -> None:
         """Subscribe to PSKReporter topics based on direction.
 
-        Topic format: pskr/filter/v2/{?}/{mode}/{sender}/{receiver}/...
-        RX = spots where my callsign is receiver (position 6)
-        TX = spots where my callsign is sender (position 5)
+        Topic format: pskr/filter/v2/{band}/{mode}/{sender}/{receiver}/...
+        RX = spots where my callsign is receiver
+        TX = spots where my callsign is sender
         """
         if self._mqtt_client is None:
             return
 
-        # Use callsign as-is (uppercase), matching Docker script behavior
+        self._health.subscribed_topics = []
         callsign = self._callsign
 
         if self._direction in (DIRECTION_RX, DIRECTION_DUAL):
             # RX: any sender -> my callsign as receiver
             topic_rx = f"pskr/filter/v2/+/+/+/{callsign}/#"
             self._mqtt_client.subscribe(topic_rx, qos=0)
+            self._health.subscribed_topics.append(topic_rx)
             _LOGGER.info("Subscribed to RX topic: %s", topic_rx)
 
         if self._direction in (DIRECTION_TX, DIRECTION_DUAL):
             # TX: my callsign as sender -> any receiver
             topic_tx = f"pskr/filter/v2/+/+/{callsign}/+/#"
             self._mqtt_client.subscribe(topic_tx, qos=0)
+            self._health.subscribed_topics.append(topic_tx)
             _LOGGER.info("Subscribed to TX topic: %s", topic_tx)
 
     def _on_message(
@@ -205,17 +255,38 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         msg: mqtt.MQTTMessage,
     ) -> None:
         """Handle incoming MQTT message."""
+        now = time.time()
+        self._health.total_messages += 1
+        self._health.last_message_time = now
+        self._message_times.append(now)
+
         try:
             payload = json.loads(msg.payload.decode("utf-8"))
+
+            # Track sequence gaps
+            if "sq" in payload:
+                seq = int(payload["sq"])
+                if self._last_sequence is not None:
+                    gap = seq - self._last_sequence - 1
+                    if gap > 0 and gap < SEQUENCE_GAP_THRESHOLD:
+                        self._health.sequence_gaps += 1
+                        self._health.total_gap_size += gap
+                        _LOGGER.debug("Sequence gap detected: %d messages missed", gap)
+                self._last_sequence = seq
+
             spot = self._parse_spot(payload, msg.topic)
-            if spot and self._should_include_spot(spot):
+            if spot is None:
+                self._health.incomplete_spots += 1
+            elif self._should_include_spot(spot):
                 self._spots.append(spot)
                 asyncio.run_coroutine_threadsafe(
                     self.async_request_refresh(), self.hass.loop
                 )
         except json.JSONDecodeError:
+            self._health.parse_errors += 1
             _LOGGER.debug("Failed to parse MQTT message: %s", msg.payload)
         except Exception as err:
+            self._health.parse_errors += 1
             _LOGGER.debug("Error processing spot: %s", err)
 
     def _parse_spot(self, payload: dict, _topic: str) -> SpotData | None:
@@ -240,6 +311,11 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
             if sender_locator and receiver_locator:
                 distance_km = self._calculate_distance(sender_locator, receiver_locator)
 
+            # Get band directly from payload, fallback to calculation
+            band = payload.get("b", "")
+            if not band:
+                band = self._get_band_from_frequency(frequency)
+
             return SpotData(
                 sender_callsign=sender,
                 receiver_callsign=receiver,
@@ -252,6 +328,11 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                 distance_km=distance_km,
                 sender_dxcc=str(payload.get("sa", "")),
                 receiver_dxcc=str(payload.get("ra", "")),
+                # New fields
+                band=band,
+                sender_azimuth=int(payload.get("sa", 0)) if isinstance(payload.get("sa"), (int, float)) else 0,
+                receiver_azimuth=int(payload.get("ra", 0)) if isinstance(payload.get("ra"), (int, float)) else 0,
+                sequence=int(payload.get("sq", 0)),
             )
         except (KeyError, ValueError, TypeError) as err:
             _LOGGER.debug("Failed to parse spot: %s", err)
@@ -308,12 +389,45 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         cutoff = time.time() - self._spot_ttl
         self._spots = [s for s in self._spots if s.timestamp > cutoff]
 
+    def _calculate_health_metrics(self) -> HealthMetrics:
+        """Calculate current health metrics."""
+        now = time.time()
+
+        # Connection uptime
+        if self._connected and self._health.connected_at > 0:
+            self._health.connection_uptime = now - self._health.connected_at
+        else:
+            self._health.connection_uptime = 0.0
+
+        # Feed latency (time since last message)
+        if self._health.last_message_time > 0:
+            self._health.feed_latency = now - self._health.last_message_time
+        else:
+            self._health.feed_latency = now - self._startup_time  # Never received a message
+
+        # Messages in last minute
+        cutoff = now - MESSAGE_RATE_WINDOW
+        self._health.messages_last_minute = sum(1 for t in self._message_times if t > cutoff)
+
+        # Feed health determination
+        # Feed is healthy if:
+        # 1. We're connected AND
+        # 2. We've received a message in the last FEED_HEALTHY_THRESHOLD seconds
+        self._health.feed_healthy = (
+            self._connected and
+            self._health.last_message_time > 0 and
+            self._health.feed_latency < FEED_HEALTHY_THRESHOLD
+        )
+
+        return self._health
+
     def _calculate_statistics(self) -> PSKReporterData:
         """Calculate statistics from current spots."""
         self._cleanup_old_spots()
+        health = self._calculate_health_metrics()
 
         if not self._spots:
-            return PSKReporterData(connected=self._connected)
+            return PSKReporterData(connected=self._connected, health=health)
 
         stats_cutoff = time.time() - self._stats_window
         recent_spots = [s for s in self._spots if s.timestamp > stats_cutoff]
@@ -323,6 +437,7 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                 spots=self._spots,
                 total_spots=len(self._spots),
                 connected=self._connected,
+                health=health,
             )
 
         unique_stations: set[str] = set()
@@ -337,7 +452,8 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
             else:
                 unique_stations.add(spot.sender_callsign)
 
-            band = self._get_band_from_frequency(spot.frequency)
+            # Use band from spot (now populated from payload or calculated)
+            band = spot.band if spot.band else self._get_band_from_frequency(spot.frequency)
             band_counts[band] += 1
             mode_counts[spot.mode] += 1
             total_snr += spot.snr
@@ -363,6 +479,7 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
             mode_counts=dict(mode_counts),
             last_spot_time=max(s.timestamp for s in recent_spots),
             connected=self._connected,
+            health=health,
         )
 
     async def _async_update_data(self) -> PSKReporterData:

@@ -68,6 +68,32 @@
       },
       "connection_status": {
         "name": "Connection Status"
+      },
+      "feed_status": {
+        "name": "Feed Status"
+      },
+      "message_rate": {
+        "name": "Message Rate"
+      },
+      "feed_latency": {
+        "name": "Feed Latency"
+      },
+      "connection_uptime": {
+        "name": "Connection Uptime"
+      },
+      "reconnect_count": {
+        "name": "Reconnect Count"
+      },
+      "sequence_gaps": {
+        "name": "Sequence Gaps"
+      },
+      "parse_errors": {
+        "name": "Parse Errors"
+      }
+    },
+    "binary_sensor": {
+      "feed_health": {
+        "name": "Feed Health"
       }
     }
   }

@@ -1,4 +1,4 @@
-"""PSKReporter Monitor integration for Home Assistant."""
+"""PSKReporter HA Bridge integration for Home Assistant."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from .coordinator import PSKReporterCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
