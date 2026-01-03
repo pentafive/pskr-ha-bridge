@@ -124,9 +124,10 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         self._mqtt_client = mqtt.Client(
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
             transport="websockets",
+            client_id=f"ha_pskr_{self._callsign}",
         )
         self._mqtt_client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
-        self._mqtt_client.ws_set_options(path="/")
+        self._mqtt_client.reconnect_delay_set(min_delay=5, max_delay=120)
 
         self._mqtt_client.on_connect = self._on_connect
         self._mqtt_client.on_disconnect = self._on_disconnect
@@ -173,21 +174,29 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         _LOGGER.warning("Disconnected from PSKReporter MQTT: %s", reason_code)
 
     def _subscribe_topics(self) -> None:
-        """Subscribe to PSKReporter topics based on direction."""
+        """Subscribe to PSKReporter topics based on direction.
+
+        Topic format: pskr/filter/v2/{?}/{mode}/{sender}/{receiver}/...
+        RX = spots where my callsign is receiver (position 6)
+        TX = spots where my callsign is sender (position 5)
+        """
         if self._mqtt_client is None:
             return
 
-        callsign = self._callsign.replace("/", "_")
+        # Use callsign as-is (uppercase), matching Docker script behavior
+        callsign = self._callsign
 
         if self._direction in (DIRECTION_RX, DIRECTION_DUAL):
-            topic_rx = f"pskr/filter/v2/+/+/+/+/+/{callsign}/+"
+            # RX: any sender -> my callsign as receiver
+            topic_rx = f"pskr/filter/v2/+/+/+/{callsign}/#"
             self._mqtt_client.subscribe(topic_rx, qos=0)
-            _LOGGER.debug("Subscribed to RX topic: %s", topic_rx)
+            _LOGGER.info("Subscribed to RX topic: %s", topic_rx)
 
         if self._direction in (DIRECTION_TX, DIRECTION_DUAL):
-            topic_tx = f"pskr/filter/v2/{callsign}/+/+/+/+/+/+"
+            # TX: my callsign as sender -> any receiver
+            topic_tx = f"pskr/filter/v2/+/+/{callsign}/+/#"
             self._mqtt_client.subscribe(topic_tx, qos=0)
-            _LOGGER.debug("Subscribed to TX topic: %s", topic_tx)
+            _LOGGER.info("Subscribed to TX topic: %s", topic_tx)
 
     def _on_message(
         self,
@@ -209,18 +218,27 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         except Exception as err:
             _LOGGER.debug("Error processing spot: %s", err)
 
-    def _parse_spot(self, payload: dict, topic: str) -> SpotData | None:
+    def _parse_spot(self, payload: dict, _topic: str) -> SpotData | None:
         """Parse spot data from MQTT payload."""
         try:
-            parts = topic.split("/")
-            if len(parts) < 10:
+            # Extract callsigns from payload (matching Docker script)
+            sender = payload.get("sc", "")
+            receiver = payload.get("rc", "")
+
+            if not sender or not receiver:
+                _LOGGER.debug("Missing sender/receiver in payload: %s", payload)
                 return None
 
-            sender = parts[3]
-            receiver = parts[8]
             frequency = float(payload.get("f", 0)) / 1000000
             mode = payload.get("md", "UNKNOWN")
             snr = int(payload.get("rp", 0))
+            sender_locator = payload.get("sl", "")
+            receiver_locator = payload.get("rl", "")
+
+            # Calculate distance if both locators available
+            distance_km = 0.0
+            if sender_locator and receiver_locator:
+                distance_km = self._calculate_distance(sender_locator, receiver_locator)
 
             return SpotData(
                 sender_callsign=sender,
@@ -228,15 +246,31 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                 frequency=frequency,
                 mode=mode,
                 snr=snr,
-                timestamp=time.time(),
-                sender_locator=payload.get("sl", ""),
-                receiver_locator=payload.get("rl", ""),
+                timestamp=payload.get("t", time.time()),
+                sender_locator=sender_locator,
+                receiver_locator=receiver_locator,
+                distance_km=distance_km,
                 sender_dxcc=str(payload.get("sa", "")),
                 receiver_dxcc=str(payload.get("ra", "")),
             )
-        except (KeyError, ValueError, IndexError) as err:
+        except (KeyError, ValueError, TypeError) as err:
             _LOGGER.debug("Failed to parse spot: %s", err)
             return None
+
+    def _calculate_distance(self, loc1: str, loc2: str) -> float:
+        """Calculate distance between two Maidenhead locators."""
+        try:
+            from pyhamtools.locator import calculate_distance
+
+            # Truncate to 6 chars for calculation (matching Docker)
+            loc1 = loc1[:6].upper() if len(loc1) >= 4 else ""
+            loc2 = loc2[:6].upper() if len(loc2) >= 4 else ""
+
+            if len(loc1) >= 4 and len(loc2) >= 4:
+                return calculate_distance(loc1, loc2)
+        except Exception as err:
+            _LOGGER.debug("Distance calculation failed: %s", err)
+        return 0.0
 
     def _should_include_spot(self, spot: SpotData) -> bool:
         """Check if spot passes configured filters."""
