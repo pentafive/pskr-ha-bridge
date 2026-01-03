@@ -23,9 +23,9 @@ DIRECTION_OPTIONS: Final = [DIRECTION_RX, DIRECTION_TX, DIRECTION_DUAL]
 # PSKReporter MQTT settings
 PSK_BROKER: Final = "mqtt.pskreporter.info"
 PSK_PORT_MQTT: Final = 1883
-PSK_PORT_MQTT_TLS: Final = 8883
-PSK_PORT_WS: Final = 80
-PSK_PORT_WS_TLS: Final = 443
+PSK_PORT_MQTT_TLS: Final = 1884
+PSK_PORT_WS: Final = 1885
+PSK_PORT_WS_TLS: Final = 1886
 
 # Transport modes
 TRANSPORT_MQTT: Final = "MQTT"
