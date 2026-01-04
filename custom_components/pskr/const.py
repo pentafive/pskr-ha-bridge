@@ -12,6 +12,12 @@ CONF_MAX_DISTANCE: Final = "max_distance"
 CONF_COUNTRY_FILTER: Final = "country_filter"
 CONF_BAND_FILTER: Final = "band_filter"
 CONF_MODE_FILTER: Final = "mode_filter"
+CONF_COUNT_ONLY: Final = "count_only"
+CONF_SAMPLE_RATE: Final = "sample_rate"
+
+# Monitor types
+MONITOR_PERSONAL: Final = "personal"
+MONITOR_GLOBAL: Final = "global"
 
 # Direction options
 DIRECTION_RX: Final = "rx"
@@ -19,6 +25,15 @@ DIRECTION_TX: Final = "tx"
 DIRECTION_DUAL: Final = "dual"
 
 DIRECTION_OPTIONS: Final = [DIRECTION_RX, DIRECTION_TX, DIRECTION_DUAL]
+
+# Global subscription topics (FT8 + FT4 for efficiency)
+GLOBAL_TOPICS: Final = [
+    "pskr/filter/v2/+/FT8/+/+/#",
+    "pskr/filter/v2/+/FT4/+/+/#",
+]
+
+# HF bands for global per-band sensors
+HF_BANDS: Final = ["160m", "80m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m"]
 
 # PSKReporter MQTT settings
 PSK_BROKER: Final = "mqtt.pskreporter.info"
@@ -41,6 +56,8 @@ DEFAULT_MAX_DISTANCE: Final = 0  # 0 = no limit
 DEFAULT_STATS_WINDOW: Final = 900  # 15 minutes in seconds
 DEFAULT_CLEANUP_INTERVAL: Final = 60  # seconds
 DEFAULT_SPOT_TTL: Final = 900  # 15 minutes
+DEFAULT_COUNT_ONLY: Final = False
+DEFAULT_SAMPLE_RATE: Final = 10  # Process 1 in N messages for global mode
 
 # Sensor update interval
 UPDATE_INTERVAL: Final = 30  # seconds

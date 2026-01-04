@@ -1,177 +1,242 @@
-# PSKReporter HA Bridge
+<p align="center">
+  <img src="https://raw.githubusercontent.com/pentafive/pskr-ha-bridge/main/images/logo.png" alt="PSKReporter HA Bridge" width="400">
+</p>
 
-[![HACS Validation](https://github.com/pentafive/pskr-ha-bridge/actions/workflows/hacs-validation.yml/badge.svg)](https://github.com/pentafive/pskr-ha-bridge/actions/workflows/hacs-validation.yml)
-[![Ruff](https://github.com/pentafive/pskr-ha-bridge/actions/workflows/ruff.yml/badge.svg)](https://github.com/pentafive/pskr-ha-bridge/actions/workflows/ruff.yml)
+<p align="center">
+  <a href="https://github.com/hacs/integration"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS Custom"></a>
+  <a href="https://github.com/pentafive/pskr-ha-bridge/releases"><img src="https://img.shields.io/github/v/release/pentafive/pskr-ha-bridge" alt="GitHub Release"></a>
+  <a href="https://github.com/pentafive/pskr-ha-bridge/blob/main/LICENSE"><img src="https://img.shields.io/github/license/pentafive/pskr-ha-bridge" alt="License"></a>
+  <a href="https://github.com/pentafive/pskr-ha-bridge/actions/workflows/hacs-validation.yml"><img src="https://github.com/pentafive/pskr-ha-bridge/actions/workflows/hacs-validation.yml/badge.svg" alt="HACS Validation"></a>
+</p>
 
-Monitor amateur radio spot data from [PSKReporter.info](https://pskreporter.info/) in Home Assistant.
+Monitor amateur radio digital mode propagation from [PSKReporter.info](https://pskreporter.info/) in Home Assistant. Track FT8, FT4, WSPR, and other digital modes with real-time statistics, band activity, and feed health monitoring.
 
-Track FT8, FT4, WSPR, and other digital mode activity for your callsign with real-time statistics and dashboard integration.
+## Features
 
-## Installation Options
+- **Personal Callsign Monitoring** - Track spots for your specific callsign (RX, TX, or both)
+- **Global Propagation Monitor** - PSKReporter-wide statistics without a callsign
+- **Per-Band Activity** - Monitor propagation on 160m through 6m
+- **Feed Health Monitoring** - Real-time MQTT connection and data flow status
+- **Low-Resource Mode** - Count-only option for memory-constrained devices
+- **Rate Limiting** - Configurable message sampling for global monitoring
+- **Two Deployment Options** - Native HACS integration or Docker/MQTT bridge
 
-Choose the installation method that best fits your setup:
+## Monitor Modes
 
-| Method | Best For | MQTT Broker Required |
-|--------|----------|---------------------|
-| **HACS Integration** (Recommended) | Most Home Assistant users | No |
-| **Docker Container** | Kubernetes, Synology, Proxmox, non-HA setups | Yes |
+### Personal Monitor (Callsign Required)
 
----
+Track spots where you are the sender or receiver:
+- See who's hearing your signal and from where
+- Monitor band conditions for your location
+- Track DX achievements and propagation patterns
 
-## Option A: HACS Integration (Recommended)
+### Global Monitor (No Callsign)
 
-Native Home Assistant custom component with UI-based configuration.
+Monitor PSKReporter-wide network activity:
+- View overall band conditions across the network
+- Track which bands are open globally
+- Monitor PSKReporter feed health
+- Ideal for non-hams or general propagation awareness
 
-### Prerequisites
+## Installation
 
-- Home Assistant 2024.1.0 or newer
-- [HACS](https://hacs.xyz/) installed
-
-### Installation
+### Option 1: HACS (Recommended)
 
 1. Open HACS in Home Assistant
-2. Click **Integrations** > **+ Explore & Download Repositories**
-3. Search for "PSKReporter Monitor"
-4. Click **Download**
+2. Click the three dots menu > **Custom repositories**
+3. Add `https://github.com/pentafive/pskr-ha-bridge` as an **Integration**
+4. Search for "PSKReporter Monitor" and install
 5. Restart Home Assistant
-6. Go to **Settings** > **Devices & Services** > **+ Add Integration**
-7. Search for "PSKReporter Monitor"
-8. Enter your callsign and select monitoring direction (RX/TX/Both)
+6. Go to **Settings > Devices & Services > Add Integration**
+7. Search for "PSKReporter Monitor" and configure
 
-### Configuration
+### Option 2: Docker/MQTT Bridge
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| Callsign | Your amateur radio callsign | Required |
-| Direction | RX (received), TX (transmitted), or Both | RX |
-| Min Distance | Minimum spot distance in km (0 = no filter) | 0 |
-| Max Distance | Maximum spot distance in km (0 = no limit) | 0 |
-| Mode Filter | Filter by specific digital modes | All |
+For container deployment or MQTT-based integration:
 
-### Sensors Created
+1. **Clone the repository:**
+    ```bash
+    git clone https://github.com/pentafive/pskr-ha-bridge.git
+    cd pskr-ha-bridge
+    ```
 
-- **Total Spots** - Number of spots in the 15-minute window
-- **Unique Stations** - Count of unique callsigns heard/hearing you
-- **Most Active Band** - Band with most activity
-- **Most Active Mode** - Digital mode with most activity
-- **Maximum Distance** - Furthest spot distance (km)
-- **Average SNR** - Mean signal-to-noise ratio (dB)
-- **Spots per Minute** - Activity rate
-- **Last Spot Time** - Timestamp of most recent spot
-- **Connection Status** - PSKReporter MQTT connection state
+2. **Configure:** Copy `.env.example` to `.env` and edit:
+    ```bash
+    cp .env.example .env
+    nano .env
+    ```
 
----
+3. **Run with Docker Compose:**
+    ```bash
+    docker compose up -d
+    ```
 
-## Option B: Docker Container
+## Sensors
 
-Standalone Python container for users who prefer Docker deployment or don't use Home Assistant.
+### Personal Monitor Sensors
 
-### Prerequisites
+| Category | Sensor | Description | Unit |
+|----------|--------|-------------|------|
+| **Activity** | Total Spots | Spots in last 15 minutes | spots |
+| **Activity** | Unique Stations | Distinct callsigns | stations |
+| **Activity** | Spots per Minute | Current activity rate | spots/min |
+| **Activity** | Last Spot Time | When last spot received | timestamp |
+| **Propagation** | Most Active Band | Band with most spots | band |
+| **Propagation** | Most Active Mode | Mode with most spots | mode |
+| **Propagation** | Maximum Distance | Furthest spot | km |
+| **Propagation** | Average SNR | Mean signal-to-noise | dB |
+| **Connection** | Connection Status | MQTT connected | Connected/Disconnected |
+| **Health** | Feed Status | Data flowing | Healthy/Unhealthy |
+| **Health** | Message Rate | MQTT messages/min | msg/min |
+| **Health** | Feed Latency | Time since last message | seconds |
+| **Health** | Connection Uptime | Time connected | seconds |
+| **Health** | Reconnect Count | Connection restarts | count |
+| **Health** | Sequence Gaps | Missed messages detected | count |
+| **Health** | Parse Errors | Malformed messages | count |
 
-- Docker and Docker Compose
-- MQTT broker (e.g., Mosquitto)
-- Home Assistant with MQTT integration (optional)
+### Global Monitor Sensors
 
-### Quick Start
+| Category | Sensor | Description | Unit |
+|----------|--------|-------------|------|
+| **Activity** | Global Spots | Total MQTT messages | spots |
+| **Activity** | Global Unique Stations | Stations seen | stations |
+| **Propagation** | Most Active Band (Global) | Top band | band |
+| **Propagation** | Most Active Mode (Global) | Top mode | mode |
+| **Per-Band** | 160m Activity | 160m spot count | spots |
+| **Per-Band** | 80m Activity | 80m spot count | spots |
+| **Per-Band** | 40m Activity | 40m spot count | spots |
+| **Per-Band** | 30m Activity | 30m spot count | spots |
+| **Per-Band** | 20m Activity | 20m spot count | spots |
+| **Per-Band** | 17m Activity | 17m spot count | spots |
+| **Per-Band** | 15m Activity | 15m spot count | spots |
+| **Per-Band** | 12m Activity | 12m spot count | spots |
+| **Per-Band** | 10m Activity | 10m spot count | spots |
+| **Per-Band** | 6m Activity | 6m spot count | spots |
+| **Health** | *(same as personal)* | | |
 
-```bash
-# Clone the repository
-git clone https://github.com/pentafive/pskr-ha-bridge.git
-cd pskr-ha-bridge
+### Binary Sensors
 
-# Create configuration
-cp .env.example .env
-nano .env  # Edit with your settings
+| Sensor | Description |
+|--------|-------------|
+| Feed Health | ON when data flowing, OFF when stale (>60s) |
 
-# Start the container
-docker compose up -d
-```
+## Understanding the Data
 
-### Configuration (.env)
+### What is PSKReporter?
 
-```ini
-# Required
-MY_CALLSIGN=W1ABC
-HA_MQTT_BROKER=192.168.1.100
+[PSKReporter.info](https://pskreporter.info/) is a real-time database of amateur radio digital mode reception reports. When software like WSJT-X decodes a digital signal, it automatically reports the reception to PSKReporter, creating a global picture of radio propagation.
 
-# Optional (with defaults shown)
-DEBUG_MODE=False
-PSK_TRANSPORT_MODE=MQTT_WS_TLS
-SCRIPT_DIRECTION=rx
-HA_MQTT_PORT=1883
-HA_MQTT_USER=
-HA_MQTT_PASS=
-```
+### Spots vs Messages
 
-See `.env.example` for all configuration options.
+- **Spot**: A reception report (Station A heard Station B on frequency X with SNR Y)
+- **Message**: Raw MQTT message from the PSKReporter feed
 
-### Docker Compose
+### Feed Health
 
-```yaml
-services:
-  pskr-ha-bridge:
-    image: pentafive/pskr-ha-bridge:latest
-    container_name: pskr-ha-bridge
-    restart: unless-stopped
-    env_file: .env
-```
+The `feed_health` binary sensor indicates whether PSKReporter data is flowing:
+- **ON (Healthy)**: Messages received within the last 60 seconds
+- **OFF (Unhealthy)**: No messages for 60+ seconds
 
-### Home Assistant Integration (Docker Mode)
+Unhealthy can mean:
+- PSKReporter MQTT feed is down (rare)
+- Your callsign has no activity (common during off-hours)
+- Network connectivity issue
 
-1. Ensure MQTT integration is configured in Home Assistant
-2. Enable MQTT discovery in **Settings** > **Devices & Services** > **MQTT** > **Configure**
-3. After starting the container, devices will auto-discover:
-   - `PSKr Spots ({CALLSIGN})`
-   - `PSKr Stats RX ({CALLSIGN})`
-   - `PSKr Stats TX ({CALLSIGN})` (if using dual mode)
+### Sample Rate (Global Mode)
 
----
+Global mode processes 1 in N messages to reduce CPU/memory load. Default: 1:10.
 
-## Dashboard Examples
+At ~1500 messages/minute globally, sampling 1:10 means processing ~150/min - statistically representative while being resource-friendly.
 
-### Lovelace Card (Minimal)
+### Band Activity
 
-```yaml
-type: entities
-title: PSKReporter - W1ABC
-entities:
-  - entity: sensor.pskreporter_w1abc_rx_total_spots
-  - entity: sensor.pskreporter_w1abc_rx_unique_stations
-  - entity: sensor.pskreporter_w1abc_rx_most_active_band
-  - entity: sensor.pskreporter_w1abc_rx_max_distance
-```
+Per-band sensors show relative propagation conditions:
+- **High counts** = Band is open, propagation is good
+- **Low/zero counts** = Band closed or inactive
 
-See `examples/` directory for more dashboard configurations.
-
----
-
-## Troubleshooting
+## Configuration
 
 ### HACS Integration
 
-| Issue | Solution |
-|-------|----------|
-| Integration not found | Restart HA after HACS download |
-| No sensors appearing | Check callsign format, wait for spots |
-| Connection failed | Check network/firewall, PSKReporter status |
+Configure via the UI:
 
-### Docker Container
+| Option | Description | Personal Mode | Global Mode |
+|--------|-------------|---------------|-------------|
+| Callsign | Your amateur radio callsign | Required | Leave empty |
+| Direction | RX, TX, or Both | Yes | N/A |
 
-| Issue | Solution |
-|-------|----------|
-| Container exits | Check `docker logs pskr-ha-bridge` |
-| No MQTT connection | Verify broker address, credentials |
-| Missing sensors | Enable MQTT discovery in HA |
+#### Options (After Setup)
 
----
+| Option | Description | Default |
+|--------|-------------|---------|
+| Count-Only Mode | Don't store individual spots (reduces memory) | Off |
+| Sample Rate | Process 1 in N messages (1-100) | 10 |
+| Minimum Distance | Filter spots closer than X km | 0 (disabled) |
+| Maximum Distance | Filter spots farther than X km | 0 (disabled) |
+| Mode Filter | Only show specific digital modes | All |
+
+### Docker Bridge
+
+All configuration via environment variables. See `.env.example` for the full list.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `MY_CALLSIGN` | Your callsign | *required* |
+| `HA_MQTT_BROKER` | MQTT broker host | `homeassistant.local` |
+| `HA_MQTT_PASS` | MQTT password | `""` |
+| `SCRIPT_DIRECTION` | `rx`, `tx`, or `dual` | `rx` |
+
+## Requirements
+
+- **Home Assistant** 2024.1.0+ (for HACS integration)
+- **Internet connection** for PSKReporter MQTT feed
+- **Optional**: Amateur radio callsign (for personal monitoring)
+
+### For Docker Bridge Only
+- **MQTT Broker** - Mosquitto or compatible
+- **MQTT Integration** - Home Assistant MQTT with discovery enabled
+
+## Technical Details
+
+### Data Source
+
+This integration connects to the public PSKReporter MQTT feed at `mqtt.pskreporter.info`. The feed provides real-time spot data as JSON messages over MQTT WebSocket (port 1886, TLS).
+
+### Topic Structure
+
+Personal monitor subscribes to callsign-specific topics:
+```
+pskr/filter/v2/+/+/{callsign}/+/#  (RX - spots received by callsign)
+pskr/filter/v2/+/+/+/{callsign}/#  (TX - spots sent by callsign)
+```
+
+Global monitor subscribes to FT8/FT4 (90%+ of traffic):
+```
+pskr/filter/v2/+/FT8/+/+/#
+pskr/filter/v2/+/FT4/+/+/#
+```
+
+### Resource Usage
+
+| Mode | MQTT Messages/min | Memory | CPU Impact |
+|------|-------------------|--------|------------|
+| Personal | 10-100 | ~50KB | Minimal |
+| Global (1:10) | ~150 processed | ~1KB | Minimal |
+| Global (1:1) | ~1500 | ~5KB | Low |
+
+## Documentation
+
+- [Dashboard Examples](https://github.com/pentafive/pskr-ha-bridge/wiki/Dashboard-Examples) - Lovelace configurations
+- [Troubleshooting](https://github.com/pentafive/pskr-ha-bridge/wiki/Troubleshooting) - Common issues
+- [PSKReporter Data](https://github.com/pentafive/pskr-ha-bridge/wiki/PSKReporter-Data) - Understanding the feed
 
 ## Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Security
 
-Report security vulnerabilities privately via email. See [SECURITY.md](SECURITY.md).
+Report security vulnerabilities privately. See [SECURITY.md](SECURITY.md).
 
 ## License
 
@@ -179,7 +244,14 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Acknowledgements
 
-- **Philip Gladstone, N1DQ** - [PSKReporter.info](https://pskreporter.info/)
+- **Philip Gladstone, N1DQ** - [PSKReporter.info](https://pskreporter.info/) creator and maintainer
 - **Tom, M0LTE** - Public MQTT feed at mqtt.pskreporter.info
-- **Home Assistant** - Home automation platform
-- **PyHamtools** - Amateur radio utilities library
+- **[Home Assistant](https://www.home-assistant.io/)** - Home automation platform
+- **[8311 Community](https://github.com/up-n-atom/8311)** - Inspiration for dual deployment architecture
+
+## Resources
+
+- [PSKReporter.info](https://pskreporter.info/) - Official PSKReporter website
+- [PSKReporter MQTT Documentation](https://mqtt.pskreporter.info/) - MQTT feed details
+- [WSJT-X](https://wsjt.sourceforge.io/) - FT8/FT4 software
+- [Home Assistant MQTT Integration](https://www.home-assistant.io/integrations/mqtt/)

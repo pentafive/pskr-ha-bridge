@@ -20,7 +20,7 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import ATTRIBUTION, DOMAIN
+from .const import ATTRIBUTION, DOMAIN, HF_BANDS, MONITOR_GLOBAL
 from .coordinator import PSKReporterCoordinator, PSKReporterData
 
 
@@ -191,6 +191,58 @@ HEALTH_SENSOR_DESCRIPTIONS: tuple[PSKReporterSensorEntityDescription, ...] = (
     ),
 )
 
+# Global mode sensors (no callsign - PSKReporter-wide stats)
+GLOBAL_SENSOR_DESCRIPTIONS: tuple[PSKReporterSensorEntityDescription, ...] = (
+    PSKReporterSensorEntityDescription(
+        key="global_spots_sampled",
+        translation_key="global_spots_sampled",
+        native_unit_of_measurement="spots",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.health.total_messages,
+        attr_fn=lambda data: {
+            "sample_rate": f"1:{data.sample_rate}",
+            "processed_messages": data.processed_messages,
+        },
+    ),
+    PSKReporterSensorEntityDescription(
+        key="global_unique_stations",
+        translation_key="global_unique_stations",
+        native_unit_of_measurement="stations",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.global_unique_stations,
+    ),
+    PSKReporterSensorEntityDescription(
+        key="global_most_active_band",
+        translation_key="global_most_active_band",
+        value_fn=lambda data: (
+            max(data.band_counts, key=data.band_counts.get)
+            if data.band_counts
+            else "Unknown"
+        ),
+        attr_fn=lambda data: {"band_counts": data.band_counts},
+    ),
+    PSKReporterSensorEntityDescription(
+        key="global_most_active_mode",
+        translation_key="global_most_active_mode",
+        value_fn=lambda data: (
+            max(data.mode_counts, key=data.mode_counts.get)
+            if data.mode_counts
+            else "Unknown"
+        ),
+        attr_fn=lambda data: {"mode_counts": data.mode_counts},
+    ),
+    PSKReporterSensorEntityDescription(
+        key="connection_status",
+        translation_key="connection_status",
+        value_fn=lambda data: "Connected" if data.connected else "Disconnected",
+        attr_fn=lambda data: {
+            "reconnect_count": data.health.reconnect_count,
+            "last_disconnect_reason": data.health.last_disconnect_reason,
+            "subscribed_topics": data.health.subscribed_topics,
+        },
+    ),
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -202,11 +254,20 @@ async def async_setup_entry(
 
     entities: list[PSKReporterSensor] = []
 
-    # Add main sensors
-    for description in SENSOR_DESCRIPTIONS:
-        entities.append(PSKReporterSensor(coordinator, description))
+    if coordinator.monitor_type == MONITOR_GLOBAL:
+        # Global mode: add global sensors
+        for description in GLOBAL_SENSOR_DESCRIPTIONS:
+            entities.append(PSKReporterSensor(coordinator, description))
 
-    # Add health sensors
+        # Add per-band sensors for HF bands
+        for band in HF_BANDS:
+            entities.append(PSKReporterBandSensor(coordinator, band))
+    else:
+        # Personal mode: add main activity sensors
+        for description in SENSOR_DESCRIPTIONS:
+            entities.append(PSKReporterSensor(coordinator, description))
+
+    # Add health sensors for both modes
     for description in HEALTH_SENSOR_DESCRIPTIONS:
         entities.append(PSKReporterSensor(coordinator, description))
 
@@ -228,11 +289,25 @@ class PSKReporterSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity)
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.entity_description = description
-        self._attr_unique_id = f"{coordinator.callsign}_{coordinator.direction}_{description.key}"
+
+        # Unique ID based on monitor type
+        if coordinator.monitor_type == MONITOR_GLOBAL:
+            self._attr_unique_id = f"global_monitor_{description.key}"
+        else:
+            self._attr_unique_id = f"{coordinator.callsign}_{coordinator.direction}_{description.key}"
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
+        if self.coordinator.monitor_type == MONITOR_GLOBAL:
+            return DeviceInfo(
+                identifiers={(DOMAIN, "global_monitor")},
+                name="PSKReporter - Global Monitor",
+                manufacturer="PSKReporter.info",
+                model="PSKReporter HA Bridge (Global)",
+                sw_version="2.0.0",
+                configuration_url="https://pskreporter.info",
+            )
         return DeviceInfo(
             identifiers={(DOMAIN, f"{self.coordinator.callsign}_{self.coordinator.direction}")},
             name=f"PSKReporter - {self.coordinator.callsign}",
@@ -253,3 +328,59 @@ class PSKReporterSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity)
         if self.entity_description.attr_fn:
             return self.entity_description.attr_fn(self.coordinator.data)
         return None
+
+
+class PSKReporterBandSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity):
+    """Sensor for per-band activity in global mode."""
+
+    _attr_attribution = ATTRIBUTION
+    _attr_has_entity_name = True
+    _attr_native_unit_of_measurement = "spots"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        coordinator: PSKReporterCoordinator,
+        band: str,
+    ) -> None:
+        """Initialize the band sensor."""
+        super().__init__(coordinator)
+        self._band = band
+        self._attr_unique_id = f"global_monitor_band_{band}"
+        self._attr_translation_key = "band_activity"
+        self._attr_translation_placeholders = {"band": band}
+        # Fallback name if translation not available
+        self._attr_name = f"{band} Activity"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device information."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, "global_monitor")},
+            name="PSKReporter - Global Monitor",
+            manufacturer="PSKReporter.info",
+            model="PSKReporter HA Bridge (Global)",
+            sw_version="2.0.0",
+            configuration_url="https://pskreporter.info",
+        )
+
+    @property
+    def native_value(self) -> int:
+        """Return the spot count for this band."""
+        return self.coordinator.data.band_counts.get(self._band, 0)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        return {
+            "band": self._band,
+            "percentage": self._calculate_percentage(),
+        }
+
+    def _calculate_percentage(self) -> float:
+        """Calculate what percentage of total spots this band represents."""
+        total = sum(self.coordinator.data.band_counts.values())
+        if total == 0:
+            return 0.0
+        band_count = self.coordinator.data.band_counts.get(self._band, 0)
+        return round((band_count / total) * 100, 1)

@@ -20,17 +20,24 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .const import (
     CONF_BAND_FILTER,
     CONF_CALLSIGN,
+    CONF_COUNT_ONLY,
     CONF_COUNTRY_FILTER,
     CONF_DIRECTION,
     CONF_MAX_DISTANCE,
     CONF_MIN_DISTANCE,
     CONF_MODE_FILTER,
+    CONF_SAMPLE_RATE,
+    DEFAULT_COUNT_ONLY,
+    DEFAULT_SAMPLE_RATE,
     DEFAULT_SPOT_TTL,
     DEFAULT_STATS_WINDOW,
     DIRECTION_DUAL,
     DIRECTION_RX,
     DIRECTION_TX,
     DOMAIN,
+    GLOBAL_TOPICS,
+    MONITOR_GLOBAL,
+    MONITOR_PERSONAL,
     PSK_BROKER,
     PSK_PORT_WS_TLS,
     UPDATE_INTERVAL,
@@ -111,6 +118,11 @@ class PSKReporterData:
     connected: bool = False
     # Health metrics
     health: HealthMetrics = field(default_factory=HealthMetrics)
+    # Monitor type and global stats
+    monitor_type: str = MONITOR_PERSONAL
+    sample_rate: int = 1
+    processed_messages: int = 0
+    global_unique_stations: int = 0
 
 
 class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
@@ -127,13 +139,20 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
             update_interval=timedelta(seconds=UPDATE_INTERVAL),
         )
         self.config_entry = entry
-        self._callsign = entry.data[CONF_CALLSIGN].upper()
+        self._callsign = entry.data.get(CONF_CALLSIGN, "").upper()
         self._direction = entry.data.get(CONF_DIRECTION, DIRECTION_RX)
         self._min_distance = entry.options.get(CONF_MIN_DISTANCE, 0)
         self._max_distance = entry.options.get(CONF_MAX_DISTANCE, 0)
         self._country_filter = entry.options.get(CONF_COUNTRY_FILTER, [])
         self._band_filter = entry.options.get(CONF_BAND_FILTER, [])
         self._mode_filter = entry.options.get(CONF_MODE_FILTER, [])
+
+        # Monitor type and options
+        self._monitor_type = entry.data.get("monitor_type", MONITOR_PERSONAL)
+        if not self._callsign:
+            self._monitor_type = MONITOR_GLOBAL
+        self._count_only = entry.options.get(CONF_COUNT_ONLY, DEFAULT_COUNT_ONLY)
+        self._sample_rate = entry.options.get(CONF_SAMPLE_RATE, DEFAULT_SAMPLE_RATE)
 
         self._spots: list[SpotData] = []
         self._mqtt_client: mqtt.Client | None = None
@@ -146,8 +165,16 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         self._message_times: deque[float] = deque(maxlen=1000)  # Track recent message times
         self._last_sequence: int | None = None  # For gap detection
         self._startup_time = time.time()
+        self._message_counter = 0  # For rate limiting
+        self._processed_messages = 0  # Processed after rate limiting
 
-        self.data = PSKReporterData()
+        # Global mode aggregation (count-only, no spot storage)
+        self._global_band_counts: dict[str, int] = defaultdict(int)
+        self._global_mode_counts: dict[str, int] = defaultdict(int)
+        self._global_unique_stations: set[str] = set()
+        self._last_window_reset = time.time()
+
+        self.data = PSKReporterData(monitor_type=self._monitor_type)
 
     @property
     def callsign(self) -> str:
@@ -159,6 +186,11 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         """Return the monitoring direction."""
         return self._direction
 
+    @property
+    def monitor_type(self) -> str:
+        """Return the monitor type (personal or global)."""
+        return self._monitor_type
+
     async def async_config_entry_first_refresh(self) -> None:
         """Perform first refresh and start MQTT connection."""
         await self._async_start_mqtt()
@@ -166,10 +198,11 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
 
     def _setup_and_connect_mqtt(self) -> None:
         """Set up and connect MQTT client (blocking, runs in executor)."""
+        client_id = f"ha_pskr_{self._callsign}" if self._callsign else "ha_pskr_global"
         self._mqtt_client = mqtt.Client(
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
             transport="websockets",
-            client_id=f"ha_pskr_{self._callsign}",
+            client_id=client_id,
         )
         self._mqtt_client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
         self._mqtt_client.reconnect_delay_set(min_delay=5, max_delay=120)
@@ -185,7 +218,8 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         """Start MQTT connection to PSKReporter."""
         try:
             await self.hass.async_add_executor_job(self._setup_and_connect_mqtt)
-            _LOGGER.info("Started MQTT connection to PSKReporter for %s", self._callsign)
+            target = self._callsign if self._callsign else "global monitor"
+            _LOGGER.info("Started MQTT connection to PSKReporter for %s", target)
         except Exception as err:
             _LOGGER.error("Failed to connect to PSKReporter: %s", err)
             raise UpdateFailed(f"Failed to connect to PSKReporter: {err}") from err
@@ -227,11 +261,22 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         Topic format: pskr/filter/v2/{band}/{mode}/{sender}/{receiver}/...
         RX = spots where my callsign is receiver
         TX = spots where my callsign is sender
+        Global = FT8 + FT4 across all bands (sampled)
         """
         if self._mqtt_client is None:
             return
 
         self._health.subscribed_topics = []
+
+        if self._monitor_type == MONITOR_GLOBAL:
+            # Global mode: subscribe to FT8 + FT4 (covers 90%+ of activity)
+            for topic in GLOBAL_TOPICS:
+                self._mqtt_client.subscribe(topic, qos=0)
+                self._health.subscribed_topics.append(topic)
+                _LOGGER.info("Subscribed to global topic: %s", topic)
+            return
+
+        # Personal mode: subscribe to callsign-specific topics
         callsign = self._callsign
 
         if self._direction in (DIRECTION_RX, DIRECTION_DUAL):
@@ -259,12 +304,19 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         self._health.total_messages += 1
         self._health.last_message_time = now
         self._message_times.append(now)
+        self._message_counter += 1
+
+        # Rate limiting: skip messages based on sample rate
+        if self._sample_rate > 1 and self._message_counter % self._sample_rate != 0:
+            return
+
+        self._processed_messages += 1
 
         try:
             payload = json.loads(msg.payload.decode("utf-8"))
 
-            # Track sequence gaps
-            if "sq" in payload:
+            # Track sequence gaps (only meaningful for non-sampled messages)
+            if self._sample_rate == 1 and "sq" in payload:
                 seq = int(payload["sq"])
                 if self._last_sequence is not None:
                     gap = seq - self._last_sequence - 1
@@ -274,6 +326,15 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                         _LOGGER.debug("Sequence gap detected: %d messages missed", gap)
                 self._last_sequence = seq
 
+            # Global mode or count-only: lightweight aggregation
+            if self._monitor_type == MONITOR_GLOBAL or self._count_only:
+                self._process_global_spot(payload)
+                asyncio.run_coroutine_threadsafe(
+                    self.async_request_refresh(), self.hass.loop
+                )
+                return
+
+            # Personal mode with spot storage
             spot = self._parse_spot(payload, msg.topic)
             if spot is None:
                 self._health.incomplete_spots += 1
@@ -288,6 +349,20 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         except Exception as err:
             self._health.parse_errors += 1
             _LOGGER.debug("Error processing spot: %s", err)
+
+    def _process_global_spot(self, payload: dict) -> None:
+        """Lightweight spot processing for global/count-only mode."""
+        band = payload.get("b", "Unknown")
+        mode = payload.get("md", "Unknown")
+        sender = payload.get("sc", "")
+        receiver = payload.get("rc", "")
+
+        self._global_band_counts[band] += 1
+        self._global_mode_counts[mode] += 1
+        if sender:
+            self._global_unique_stations.add(sender)
+        if receiver:
+            self._global_unique_stations.add(receiver)
 
     def _parse_spot(self, payload: dict, _topic: str) -> SpotData | None:
         """Parse spot data from MQTT payload."""
@@ -421,13 +496,57 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
 
         return self._health
 
+    def _reset_global_stats_if_needed(self) -> None:
+        """Reset global stats if window has expired."""
+        now = time.time()
+        if now - self._last_window_reset > self._stats_window:
+            self._global_band_counts.clear()
+            self._global_mode_counts.clear()
+            self._global_unique_stations.clear()
+            self._last_window_reset = now
+
     def _calculate_statistics(self) -> PSKReporterData:
         """Calculate statistics from current spots."""
-        self._cleanup_old_spots()
         health = self._calculate_health_metrics()
 
+        # Global mode or count-only: use aggregated counters
+        if self._monitor_type == MONITOR_GLOBAL or self._count_only:
+            self._reset_global_stats_if_needed()
+
+            most_active_band = (
+                max(self._global_band_counts, key=self._global_band_counts.get)
+                if self._global_band_counts else "Unknown"
+            )
+            most_active_mode = (
+                max(self._global_mode_counts, key=self._global_mode_counts.get)
+                if self._global_mode_counts else "Unknown"
+            )
+            total_spots = sum(self._global_band_counts.values())
+
+            return PSKReporterData(
+                total_spots=total_spots,
+                unique_stations=len(self._global_unique_stations),
+                most_active_band=most_active_band,
+                most_active_mode=most_active_mode,
+                band_counts=dict(self._global_band_counts),
+                mode_counts=dict(self._global_mode_counts),
+                connected=self._connected,
+                health=health,
+                monitor_type=self._monitor_type,
+                sample_rate=self._sample_rate,
+                processed_messages=self._processed_messages,
+                global_unique_stations=len(self._global_unique_stations),
+            )
+
+        # Personal mode with spot storage
+        self._cleanup_old_spots()
+
         if not self._spots:
-            return PSKReporterData(connected=self._connected, health=health)
+            return PSKReporterData(
+                connected=self._connected,
+                health=health,
+                monitor_type=self._monitor_type,
+            )
 
         stats_cutoff = time.time() - self._stats_window
         recent_spots = [s for s in self._spots if s.timestamp > stats_cutoff]
@@ -438,6 +557,7 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                 total_spots=len(self._spots),
                 connected=self._connected,
                 health=health,
+                monitor_type=self._monitor_type,
             )
 
         unique_stations: set[str] = set()
@@ -480,6 +600,7 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
             last_spot_time=max(s.timestamp for s in recent_spots),
             connected=self._connected,
             health=health,
+            monitor_type=self._monitor_type,
         )
 
     async def _async_update_data(self) -> PSKReporterData:
