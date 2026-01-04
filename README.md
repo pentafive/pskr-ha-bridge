@@ -226,9 +226,9 @@ pskr/filter/v2/+/FT4/+/+/#
 
 ## Documentation
 
-- [Dashboard Examples](docs/wiki/Dashboard-Examples.md) - Lovelace configurations
-- [Troubleshooting](docs/wiki/Troubleshooting.md) - Common issues
-- [PSKReporter Data](docs/wiki/PSKReporter-Data.md) - Understanding the feed
+- [Dashboard Examples](https://github.com/pentafive/pskr-ha-bridge/wiki/Dashboard-Examples) - Lovelace configurations
+- [Troubleshooting](https://github.com/pentafive/pskr-ha-bridge/wiki/Troubleshooting) - Common issues
+- [PSKReporter Data](https://github.com/pentafive/pskr-ha-bridge/wiki/PSKReporter-Data) - Understanding the feed
 
 ## Contributing
 
