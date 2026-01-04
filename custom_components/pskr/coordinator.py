@@ -403,10 +403,9 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                 distance_km=distance_km,
                 sender_dxcc=str(payload.get("sa", "")),
                 receiver_dxcc=str(payload.get("ra", "")),
-                # New fields
                 band=band,
-                sender_azimuth=int(payload.get("sa", 0)) if isinstance(payload.get("sa"), (int, float)) else 0,
-                receiver_azimuth=int(payload.get("ra", 0)) if isinstance(payload.get("ra"), (int, float)) else 0,
+                # Note: azimuth fields left at default (0) - could be calculated from locators
+                # using pyhamtools.locator.calculate_heading() in future enhancement
                 sequence=int(payload.get("sq", 0)),
             )
         except (KeyError, ValueError, TypeError) as err:

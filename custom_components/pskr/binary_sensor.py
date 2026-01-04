@@ -14,7 +14,7 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import ATTRIBUTION, DOMAIN
+from .const import ATTRIBUTION, DOMAIN, MONITOR_GLOBAL
 from .coordinator import PSKReporterCoordinator
 
 
@@ -45,17 +45,29 @@ class PSKReporterFeedHealthBinarySensor(
     def __init__(self, coordinator: PSKReporterCoordinator) -> None:
         """Initialize the binary sensor."""
         super().__init__(coordinator)
-        self._attr_unique_id = f"{coordinator.callsign}_{coordinator.direction}_feed_health"
+        if coordinator.monitor_type == MONITOR_GLOBAL:
+            self._attr_unique_id = "global_monitor_feed_health"
+        else:
+            self._attr_unique_id = f"{coordinator.callsign}_{coordinator.direction}_feed_health"
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
+        if self.coordinator.monitor_type == MONITOR_GLOBAL:
+            return DeviceInfo(
+                identifiers={(DOMAIN, "global_monitor")},
+                name="PSKReporter - Global Monitor",
+                manufacturer="PSKReporter.info",
+                model="PSKReporter HA Bridge (Global)",
+                sw_version="2.0.1",
+                configuration_url="https://pskreporter.info",
+            )
         return DeviceInfo(
             identifiers={(DOMAIN, f"{self.coordinator.callsign}_{self.coordinator.direction}")},
             name=f"PSKReporter - {self.coordinator.callsign}",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge",
-            sw_version="2.0.0",
+            sw_version="2.0.1",
             configuration_url="https://pskreporter.info",
         )
 
