@@ -59,7 +59,7 @@ class PSKReporterFeedHealthBinarySensor(
                 name="PSKReporter - Global Monitor",
                 manufacturer="PSKReporter.info",
                 model="PSKReporter HA Bridge (Global)",
-                sw_version="2.0.1",
+                sw_version="2.1.0",
                 configuration_url="https://pskreporter.info",
             )
         return DeviceInfo(
@@ -67,7 +67,7 @@ class PSKReporterFeedHealthBinarySensor(
             name=f"PSKReporter - {self.coordinator.callsign}",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge",
-            sw_version="2.0.1",
+            sw_version="2.1.0",
             configuration_url="https://pskreporter.info",
         )
 

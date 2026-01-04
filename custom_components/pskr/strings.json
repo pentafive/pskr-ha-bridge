@@ -32,14 +32,22 @@
           "sample_rate": "Sample Rate",
           "min_distance": "Minimum Distance (km)",
           "max_distance": "Maximum Distance (km)",
-          "mode_filter": "Digital Modes Filter"
+          "mode_filter": "Digital Modes Filter",
+          "callsign_allow": "Callsign Allow List",
+          "callsign_block": "Callsign Block List",
+          "country_allow": "Country Allow List (DXCC)",
+          "country_block": "Country Block List (DXCC)"
         },
         "data_description": {
           "count_only": "Only count spots without storing details (reduces memory usage)",
           "sample_rate": "Process 1 in N messages (higher = less CPU, 1 = all messages)",
           "min_distance": "Only show spots beyond this distance (0 = no minimum)",
           "max_distance": "Only show spots within this distance (0 = no maximum)",
-          "mode_filter": "Only show spots using these modes (empty = all modes)"
+          "mode_filter": "Only show spots using these modes (empty = all modes)",
+          "callsign_allow": "Only include spots involving these callsigns (comma-separated, e.g., W1AW,K1ABC)",
+          "callsign_block": "Exclude spots involving these callsigns (comma-separated)",
+          "country_allow": "Only include spots from these DXCC country codes (comma-separated, e.g., 291,100)",
+          "country_block": "Exclude spots from these DXCC country codes (comma-separated)"
         }
       }
     }

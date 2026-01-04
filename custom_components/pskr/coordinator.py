@@ -20,7 +20,11 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .const import (
     CONF_BAND_FILTER,
     CONF_CALLSIGN,
+    CONF_CALLSIGN_ALLOW,
+    CONF_CALLSIGN_BLOCK,
     CONF_COUNT_ONLY,
+    CONF_COUNTRY_ALLOW,
+    CONF_COUNTRY_BLOCK,
     CONF_COUNTRY_FILTER,
     CONF_DIRECTION,
     CONF_MAX_DISTANCE,
@@ -146,6 +150,11 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         self._country_filter = entry.options.get(CONF_COUNTRY_FILTER, [])
         self._band_filter = entry.options.get(CONF_BAND_FILTER, [])
         self._mode_filter = entry.options.get(CONF_MODE_FILTER, [])
+        # Callsign and country allow/block lists (v2.1.0)
+        self._callsign_allow = {c.upper() for c in entry.options.get(CONF_CALLSIGN_ALLOW, [])}
+        self._callsign_block = {c.upper() for c in entry.options.get(CONF_CALLSIGN_BLOCK, [])}
+        self._country_allow = set(entry.options.get(CONF_COUNTRY_ALLOW, []))
+        self._country_block = set(entry.options.get(CONF_COUNTRY_BLOCK, []))
 
         # Monitor type and options
         self._monitor_type = entry.data.get("monitor_type", MONITOR_PERSONAL)
@@ -429,11 +438,35 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
 
     def _should_include_spot(self, spot: SpotData) -> bool:
         """Check if spot passes configured filters."""
+        # Distance filtering
         if self._min_distance > 0 and spot.distance_km < self._min_distance:
             return False
         if self._max_distance > 0 and spot.distance_km > self._max_distance:
             return False
-        return not (self._mode_filter and spot.mode not in self._mode_filter)
+        # Mode filtering
+        if self._mode_filter and spot.mode not in self._mode_filter:
+            return False
+        # Callsign block list (exclude if either station is blocked)
+        if self._callsign_block:
+            sender_upper = spot.sender_callsign.upper()
+            receiver_upper = spot.receiver_callsign.upper()
+            if sender_upper in self._callsign_block or receiver_upper in self._callsign_block:
+                return False
+        # Callsign allow list (only include if at least one station is allowed)
+        if self._callsign_allow:
+            sender_upper = spot.sender_callsign.upper()
+            receiver_upper = spot.receiver_callsign.upper()
+            if sender_upper not in self._callsign_allow and receiver_upper not in self._callsign_allow:
+                return False
+        # Country block list (exclude if either station's country is blocked)
+        if self._country_block and (
+            spot.sender_dxcc in self._country_block or spot.receiver_dxcc in self._country_block
+        ):
+            return False
+        # Country allow list (only include if at least one station's country is allowed)
+        if self._country_allow:
+            return spot.sender_dxcc in self._country_allow or spot.receiver_dxcc in self._country_allow
+        return True
 
     def _get_band_from_frequency(self, freq_mhz: float) -> str:
         """Determine band from frequency."""

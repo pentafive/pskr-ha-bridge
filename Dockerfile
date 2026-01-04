@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 LABEL maintainer="pentafive"
 LABEL description="PSKReporter to Home Assistant MQTT Bridge"
-LABEL version="2.0.1"
+LABEL version="2.1.0"
 
 # No additional system packages needed (pure Python app)
 # Unlike 8311-ha-bridge, we don't need SSH client

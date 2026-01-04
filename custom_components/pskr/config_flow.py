@@ -12,7 +12,11 @@ from homeassistant.data_entry_flow import FlowResult
 
 from .const import (
     CONF_CALLSIGN,
+    CONF_CALLSIGN_ALLOW,
+    CONF_CALLSIGN_BLOCK,
     CONF_COUNT_ONLY,
+    CONF_COUNTRY_ALLOW,
+    CONF_COUNTRY_BLOCK,
     CONF_DIRECTION,
     CONF_MAX_DISTANCE,
     CONF_MIN_DISTANCE,
@@ -123,7 +127,16 @@ class PSKReporterOptionsFlow(OptionsFlow):
     ) -> FlowResult:
         """Manage the options."""
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            # Convert comma-separated strings to lists for callsign/country filters
+            processed_input = dict(user_input)
+            for key in [CONF_CALLSIGN_ALLOW, CONF_CALLSIGN_BLOCK, CONF_COUNTRY_ALLOW, CONF_COUNTRY_BLOCK]:
+                if key in processed_input and isinstance(processed_input[key], str):
+                    # Split by comma, strip whitespace, filter empty, uppercase callsigns
+                    items = [item.strip() for item in processed_input[key].split(",") if item.strip()]
+                    if key in [CONF_CALLSIGN_ALLOW, CONF_CALLSIGN_BLOCK]:
+                        items = [item.upper() for item in items]
+                    processed_input[key] = items
+            return self.async_create_entry(title="", data=processed_input)
 
         options = self.config_entry.options
         is_global = self.config_entry.data.get("monitor_type") == MONITOR_GLOBAL
@@ -156,6 +169,24 @@ class PSKReporterOptionsFlow(OptionsFlow):
                 CONF_MODE_FILTER,
                 default=options.get(CONF_MODE_FILTER, []),
             )] = vol.All(vol.Coerce(list), [vol.In(DIGITAL_MODES)])
+            # Callsign allow/block lists (comma-separated strings converted to lists)
+            schema_dict[vol.Optional(
+                CONF_CALLSIGN_ALLOW,
+                default=",".join(options.get(CONF_CALLSIGN_ALLOW, [])),
+            )] = str
+            schema_dict[vol.Optional(
+                CONF_CALLSIGN_BLOCK,
+                default=",".join(options.get(CONF_CALLSIGN_BLOCK, [])),
+            )] = str
+            # Country allow/block lists (DXCC codes, comma-separated)
+            schema_dict[vol.Optional(
+                CONF_COUNTRY_ALLOW,
+                default=",".join(options.get(CONF_COUNTRY_ALLOW, [])),
+            )] = str
+            schema_dict[vol.Optional(
+                CONF_COUNTRY_BLOCK,
+                default=",".join(options.get(CONF_COUNTRY_BLOCK, [])),
+            )] = str
 
         return self.async_show_form(
             step_id="init",

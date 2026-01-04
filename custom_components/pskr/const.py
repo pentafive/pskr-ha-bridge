@@ -14,6 +14,10 @@ CONF_BAND_FILTER: Final = "band_filter"
 CONF_MODE_FILTER: Final = "mode_filter"
 CONF_COUNT_ONLY: Final = "count_only"
 CONF_SAMPLE_RATE: Final = "sample_rate"
+CONF_CALLSIGN_ALLOW: Final = "callsign_allow"
+CONF_CALLSIGN_BLOCK: Final = "callsign_block"
+CONF_COUNTRY_ALLOW: Final = "country_allow"
+CONF_COUNTRY_BLOCK: Final = "country_block"
 
 # Monitor types
 MONITOR_PERSONAL: Final = "personal"
