@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2026-01-05
+
+### Fixed
+- **Timestamp Sensor Bug** - `last_spot` sensor now returns proper `datetime` object with UTC timezone instead of ISO string, fixing `'str' object has no attribute 'tzinfo'` error
+- **Options Flow 500 Error** - Fixed invalid multi-select syntax that caused "Server got itself in trouble" error when editing integration options
+
+### Changed
+- **Improved Setup Flow** - Two-step configuration: first choose monitor type (Personal/Global), then only relevant options are shown
+- Global monitor setup no longer asks for callsign or direction (not applicable)
+- Mode filter now uses proper dropdown multi-select UI
+
+---
+
 ## [2.1.0] - 2026-01-04
 
 ### Added

@@ -9,6 +9,11 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers.selector import (
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 
 from .const import (
     CONF_CALLSIGN,
@@ -36,11 +41,15 @@ from .const import (
 
 CALLSIGN_REGEX = re.compile(r"^[A-Z0-9]{1,3}[0-9][A-Z0-9]{0,4}[A-Z](?:/[A-Z0-9]+)?$", re.IGNORECASE)
 
+CONF_MONITOR_TYPE = "monitor_type"
+
 
 def validate_callsign(callsign: str) -> str | None:
-    """Validate amateur radio callsign format. Empty is valid for global mode."""
+    """Validate amateur radio callsign format."""
     callsign = callsign.strip().upper()
-    if callsign and not CALLSIGN_REGEX.match(callsign):
+    if not callsign:
+        return "callsign_required"
+    if not CALLSIGN_REGEX.match(callsign):
         return "invalid_callsign"
     return None
 
@@ -50,10 +59,51 @@ class PSKReporterConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    def __init__(self) -> None:
+        """Initialize the config flow."""
+        self._monitor_type: str | None = None
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle the initial step."""
+        """Handle the initial step - choose monitor type."""
+        if user_input is not None:
+            self._monitor_type = user_input[CONF_MONITOR_TYPE]
+
+            if self._monitor_type == MONITOR_GLOBAL:
+                # Global monitor - check uniqueness and create entry
+                await self.async_set_unique_id("global_monitor")
+                self._abort_if_unique_id_configured()
+
+                return self.async_create_entry(
+                    title="PSKReporter - Global Monitor",
+                    data={
+                        CONF_CALLSIGN: "",
+                        CONF_DIRECTION: DIRECTION_RX,
+                        CONF_MONITOR_TYPE: MONITOR_GLOBAL,
+                    },
+                )
+            # Personal monitor - proceed to callsign step
+            return await self.async_step_callsign()
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_MONITOR_TYPE, default=MONITOR_PERSONAL): vol.In(
+                        {
+                            MONITOR_PERSONAL: "Personal Monitor (track my callsign)",
+                            MONITOR_GLOBAL: "Global Monitor (network-wide propagation)",
+                        }
+                    ),
+                }
+            ),
+        )
+
+    async def async_step_callsign(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle the callsign configuration step for personal monitor."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -62,38 +112,27 @@ class PSKReporterConfigFlow(ConfigFlow, domain=DOMAIN):
             if error := validate_callsign(callsign):
                 errors["base"] = error
             else:
-                # Determine monitor type based on callsign
-                if callsign:
-                    # Personal monitor
-                    monitor_type = MONITOR_PERSONAL
-                    direction = user_input.get(CONF_DIRECTION, DEFAULT_DIRECTION)
-                    unique_id = f"{callsign}_{direction}"
-                    title = f"PSKReporter - {callsign}"
-                else:
-                    # Global monitor
-                    monitor_type = MONITOR_GLOBAL
-                    direction = DIRECTION_RX  # Not used for global
-                    unique_id = "global_monitor"
-                    title = "PSKReporter - Global Monitor"
+                direction = user_input.get(CONF_DIRECTION, DEFAULT_DIRECTION)
+                unique_id = f"{callsign}_{direction}"
 
                 await self.async_set_unique_id(unique_id)
                 self._abort_if_unique_id_configured()
 
                 return self.async_create_entry(
-                    title=title,
+                    title=f"PSKReporter - {callsign}",
                     data={
                         CONF_CALLSIGN: callsign,
                         CONF_DIRECTION: direction,
-                        "monitor_type": monitor_type,
+                        CONF_MONITOR_TYPE: MONITOR_PERSONAL,
                     },
                 )
 
         return self.async_show_form(
-            step_id="user",
+            step_id="callsign",
             data_schema=vol.Schema(
                 {
-                    vol.Optional(CONF_CALLSIGN, default=""): str,
-                    vol.Optional(CONF_DIRECTION, default=DEFAULT_DIRECTION): vol.In(
+                    vol.Required(CONF_CALLSIGN): str,
+                    vol.Required(CONF_DIRECTION, default=DEFAULT_DIRECTION): vol.In(
                         {
                             DIRECTION_RX: "Receive (spots where I am receiving)",
                             DIRECTION_TX: "Transmit (spots where others hear me)",
@@ -103,24 +142,17 @@ class PSKReporterConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=errors,
-            description_placeholders={
-                "global_hint": "Leave callsign empty for global propagation monitor"
-            },
         )
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+    def async_get_options_flow(_config_entry: ConfigEntry) -> OptionsFlow:
         """Get the options flow for this handler."""
-        return PSKReporterOptionsFlow(config_entry)
+        return PSKReporterOptionsFlow()
 
 
 class PSKReporterOptionsFlow(OptionsFlow):
     """Handle options flow for PSKReporter Monitor."""
-
-    def __init__(self, config_entry: ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -139,7 +171,7 @@ class PSKReporterOptionsFlow(OptionsFlow):
             return self.async_create_entry(title="", data=processed_input)
 
         options = self.config_entry.options
-        is_global = self.config_entry.data.get("monitor_type") == MONITOR_GLOBAL
+        is_global = self.config_entry.data.get(CONF_MONITOR_TYPE) == MONITOR_GLOBAL
 
         # Base schema for all monitor types
         schema_dict: dict[vol.Marker, Any] = {
@@ -147,15 +179,13 @@ class PSKReporterOptionsFlow(OptionsFlow):
                 CONF_COUNT_ONLY,
                 default=options.get(CONF_COUNT_ONLY, DEFAULT_COUNT_ONLY),
             ): bool,
+            vol.Optional(
+                CONF_SAMPLE_RATE,
+                default=options.get(CONF_SAMPLE_RATE, DEFAULT_SAMPLE_RATE),
+            ): vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
         }
 
-        # Add sample rate option (more relevant for global, but available for all)
-        schema_dict[vol.Optional(
-            CONF_SAMPLE_RATE,
-            default=options.get(CONF_SAMPLE_RATE, DEFAULT_SAMPLE_RATE),
-        )] = vol.All(vol.Coerce(int), vol.Range(min=1, max=100))
-
-        # Personal monitor gets distance and mode filters
+        # Personal monitor gets additional filter options
         if not is_global:
             schema_dict[vol.Optional(
                 CONF_MIN_DISTANCE,
@@ -165,10 +195,17 @@ class PSKReporterOptionsFlow(OptionsFlow):
                 CONF_MAX_DISTANCE,
                 default=options.get(CONF_MAX_DISTANCE, 0),
             )] = vol.Coerce(int)
+            # Multi-select for digital modes
             schema_dict[vol.Optional(
                 CONF_MODE_FILTER,
                 default=options.get(CONF_MODE_FILTER, []),
-            )] = vol.All(vol.Coerce(list), [vol.In(DIGITAL_MODES)])
+            )] = SelectSelector(
+                SelectSelectorConfig(
+                    options=DIGITAL_MODES,
+                    multiple=True,
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            )
             # Callsign allow/block lists (comma-separated strings converted to lists)
             schema_dict[vol.Optional(
                 CONF_CALLSIGN_ALLOW,

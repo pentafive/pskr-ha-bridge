@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -87,7 +87,7 @@ SENSOR_DESCRIPTIONS: tuple[PSKReporterSensorEntityDescription, ...] = (
         translation_key="last_spot",
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=lambda data: (
-            datetime.fromtimestamp(data.last_spot_time).isoformat()
+            datetime.fromtimestamp(data.last_spot_time, tz=UTC)
             if data.last_spot_time > 0
             else None
         ),
@@ -305,7 +305,7 @@ class PSKReporterSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity)
                 name="PSKReporter - Global Monitor",
                 manufacturer="PSKReporter.info",
                 model="PSKReporter HA Bridge (Global)",
-                sw_version="2.1.0",
+                sw_version="2.1.1",
                 configuration_url="https://pskreporter.info",
             )
         return DeviceInfo(
@@ -313,7 +313,7 @@ class PSKReporterSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity)
             name=f"PSKReporter - {self.coordinator.callsign}",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge",
-            sw_version="2.1.0",
+            sw_version="2.1.1",
             configuration_url="https://pskreporter.info",
         )
 
@@ -360,7 +360,7 @@ class PSKReporterBandSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEnt
             name="PSKReporter - Global Monitor",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge (Global)",
-            sw_version="2.1.0",
+            sw_version="2.1.1",
             configuration_url="https://pskreporter.info",
         )
 

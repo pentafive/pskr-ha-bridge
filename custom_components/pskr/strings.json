@@ -2,24 +2,35 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configure PSKReporter HA Bridge",
-        "description": "Monitor amateur radio digital mode propagation from PSKReporter.info.\n\n**Personal Monitor:** Enter your callsign to track your spots.\n**Global Monitor:** Leave callsign empty to monitor network-wide activity.",
+        "title": "PSKReporter Monitor Type",
+        "description": "Choose how you want to monitor PSKReporter propagation data.",
         "data": {
-          "callsign": "Callsign (optional)",
+          "monitor_type": "Monitor Type"
+        },
+        "data_description": {
+          "monitor_type": "Personal tracks your callsign activity. Global shows network-wide propagation."
+        }
+      },
+      "callsign": {
+        "title": "Personal Monitor Setup",
+        "description": "Enter your amateur radio callsign and select the monitoring direction.",
+        "data": {
+          "callsign": "Callsign",
           "direction": "Monitoring Direction"
         },
         "data_description": {
-          "callsign": "Your amateur radio callsign (e.g., W1AW). Leave empty for global monitor.",
+          "callsign": "Your amateur radio callsign (e.g., W1AW)",
           "direction": "Choose whether to monitor received spots, transmitted spots, or both"
         }
       }
     },
     "error": {
       "invalid_callsign": "Invalid callsign format. Please enter a valid amateur radio callsign.",
+      "callsign_required": "Callsign is required for personal monitor mode.",
       "cannot_connect": "Unable to connect to PSKReporter.info"
     },
     "abort": {
-      "already_configured": "This callsign and direction combination is already configured"
+      "already_configured": "This monitor configuration is already set up"
     }
   },
   "options": {
