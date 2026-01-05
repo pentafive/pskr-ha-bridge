@@ -22,7 +22,7 @@ logger:
 
 ### Feed Health Shows Unhealthy
 
-**Symptoms:** `binary_sensor.feed_health` is OFF, sensors show stale data.
+**Symptoms:** `binary_sensor.pskreporter_{callsign}_feed_health` is OFF, sensors show stale data.
 
 **Possible Causes:**
 
@@ -34,9 +34,13 @@ logger:
 | Firewall blocking | Allow outbound WSS to port 1886 |
 
 **Diagnostic Steps:**
-1. Check `sensor.*_message_rate` - should be > 0 msg/min when active
-2. Check `sensor.*_connection_status` - should show "Connected"
-3. Check `sensor.*_feed_latency` - time since last message
+1. Check `sensor.pskreporter_{callsign}_message_rate` - should be > 0 msg/min when active
+2. Check `sensor.pskreporter_{callsign}_connection_status` - should show "Connected"
+3. Check `sensor.pskreporter_{callsign}_feed_latency` - time since last message
+
+**Entity ID Pattern:**
+- Personal: `sensor.pskreporter_{callsign}_{sensor_name}` (e.g., `sensor.pskreporter_w1abc_feed_status`)
+- Global: `sensor.pskreporter_global_monitor_{sensor_name}` (e.g., `sensor.pskreporter_global_monitor_feed_status`)
 
 ### Connection Status Shows Disconnected
 

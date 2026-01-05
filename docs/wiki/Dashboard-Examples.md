@@ -1,5 +1,7 @@
 # Dashboard Examples
 
+Replace `{callsign}` with your callsign in lowercase (e.g., `w1abc`, `kd5qlm`).
+
 ## Personal Monitor Cards
 
 ### Basic Entities Card
@@ -8,12 +10,13 @@
 type: entities
 title: PSKReporter - W1ABC
 entities:
-  - entity: sensor.pskreporter_w1abc_rx_total_spots
-  - entity: sensor.pskreporter_w1abc_rx_unique_stations
-  - entity: sensor.pskreporter_w1abc_rx_most_active_band
-  - entity: sensor.pskreporter_w1abc_rx_max_distance
-  - entity: sensor.pskreporter_w1abc_rx_avg_snr
-  - entity: sensor.pskreporter_w1abc_rx_spots_per_minute
+  - entity: sensor.pskreporter_w1abc_total_spots
+  - entity: sensor.pskreporter_w1abc_unique_stations
+  - entity: sensor.pskreporter_w1abc_most_active_band
+  - entity: sensor.pskreporter_w1abc_maximum_distance
+  - entity: sensor.pskreporter_w1abc_average_snr
+  - entity: sensor.pskreporter_w1abc_spots_per_minute
+  - entity: sensor.pskreporter_w1abc_last_spot_time
 ```
 
 ### Glance Card
@@ -22,13 +25,13 @@ entities:
 type: glance
 title: Ham Radio Activity
 entities:
-  - entity: sensor.pskreporter_w1abc_rx_total_spots
+  - entity: sensor.pskreporter_w1abc_total_spots
     name: Spots
-  - entity: sensor.pskreporter_w1abc_rx_unique_stations
+  - entity: sensor.pskreporter_w1abc_unique_stations
     name: Stations
-  - entity: sensor.pskreporter_w1abc_rx_most_active_band
+  - entity: sensor.pskreporter_w1abc_most_active_band
     name: Band
-  - entity: binary_sensor.pskreporter_w1abc_rx_feed_health
+  - entity: binary_sensor.pskreporter_w1abc_feed_health
     name: Feed
 ```
 
@@ -44,27 +47,27 @@ cards:
   - type: horizontal-stack
     cards:
       - type: custom:mushroom-entity-card
-        entity: sensor.pskreporter_w1abc_rx_total_spots
+        entity: sensor.pskreporter_w1abc_total_spots
         name: Spots
         icon_color: blue
       - type: custom:mushroom-entity-card
-        entity: sensor.pskreporter_w1abc_rx_unique_stations
+        entity: sensor.pskreporter_w1abc_unique_stations
         name: Stations
         icon_color: green
 
   - type: horizontal-stack
     cards:
       - type: custom:mushroom-entity-card
-        entity: sensor.pskreporter_w1abc_rx_most_active_band
+        entity: sensor.pskreporter_w1abc_most_active_band
         name: Band
         icon_color: orange
       - type: custom:mushroom-entity-card
-        entity: sensor.pskreporter_w1abc_rx_max_distance
+        entity: sensor.pskreporter_w1abc_maximum_distance
         name: Max DX
         icon_color: purple
 
   - type: custom:mushroom-entity-card
-    entity: binary_sensor.pskreporter_w1abc_rx_feed_health
+    entity: binary_sensor.pskreporter_w1abc_feed_health
     name: Feed Health
     icon_color: "{{ 'green' if is_state(entity, 'on') else 'red' }}"
 ```
@@ -105,11 +108,11 @@ entities:
 type: glance
 title: PSKReporter Global
 entities:
-  - entity: sensor.pskreporter_global_monitor_global_spots_sampled
+  - entity: sensor.pskreporter_global_monitor_global_spots
     name: Messages
   - entity: sensor.pskreporter_global_monitor_global_unique_stations
     name: Stations
-  - entity: sensor.pskreporter_global_monitor_global_most_active_band
+  - entity: sensor.pskreporter_global_monitor_most_active_band_global
     name: Top Band
   - entity: binary_sensor.pskreporter_global_monitor_feed_health
     name: Feed
@@ -149,12 +152,12 @@ type: entities
 title: PSKReporter Health
 show_header_toggle: false
 entities:
-  - entity: sensor.pskreporter_w1abc_rx_connection_status
-  - entity: sensor.pskreporter_w1abc_rx_feed_status
-  - entity: sensor.pskreporter_w1abc_rx_message_rate
-  - entity: sensor.pskreporter_w1abc_rx_feed_latency
-  - entity: sensor.pskreporter_w1abc_rx_connection_uptime
-  - entity: sensor.pskreporter_w1abc_rx_reconnect_count
+  - entity: sensor.pskreporter_w1abc_connection_status
+  - entity: sensor.pskreporter_w1abc_feed_status
+  - entity: sensor.pskreporter_w1abc_message_rate
+  - entity: sensor.pskreporter_w1abc_feed_latency
+  - entity: sensor.pskreporter_w1abc_connection_uptime
+  - entity: sensor.pskreporter_w1abc_reconnect_count
 ```
 
 ### Conditional Alert Card
@@ -162,7 +165,7 @@ entities:
 ```yaml
 type: conditional
 conditions:
-  - entity: binary_sensor.pskreporter_w1abc_rx_feed_health
+  - entity: binary_sensor.pskreporter_w1abc_feed_health
     state: "off"
 card:
   type: markdown
@@ -183,7 +186,7 @@ automation:
   - alias: "PSKReporter Feed Alert"
     trigger:
       - platform: state
-        entity_id: binary_sensor.pskreporter_w1abc_rx_feed_health
+        entity_id: binary_sensor.pskreporter_w1abc_feed_health
         to: "off"
         for:
           minutes: 5
@@ -201,11 +204,22 @@ automation:
   - alias: "Log DX Over 10000km"
     trigger:
       - platform: numeric_state
-        entity_id: sensor.pskreporter_w1abc_rx_max_distance
+        entity_id: sensor.pskreporter_w1abc_maximum_distance
         above: 10000
     action:
       - service: logbook.log
         data:
           name: "DX Achievement"
-          message: "New DX record: {{ states('sensor.pskreporter_w1abc_rx_max_distance') }} km"
+          message: "New DX record: {{ states('sensor.pskreporter_w1abc_maximum_distance') }} km"
 ```
+
+## Entity ID Naming Pattern
+
+Entity IDs follow this pattern:
+- **Personal:** `sensor.pskreporter_{callsign}_{sensor_name}`
+- **Global:** `sensor.pskreporter_global_monitor_{sensor_name}`
+
+Examples:
+- `sensor.pskreporter_kd5qlm_total_spots`
+- `sensor.pskreporter_global_monitor_20m_activity`
+- `binary_sensor.pskreporter_kd5qlm_feed_health`

@@ -158,22 +158,42 @@ Per-band sensors show relative propagation conditions:
 
 ### HACS Integration
 
-Configure via the UI:
+The setup wizard guides you through configuration:
 
-| Option | Description | Personal Mode | Global Mode |
-|--------|-------------|---------------|-------------|
-| Callsign | Your amateur radio callsign | Required | Leave empty |
-| Direction | RX, TX, or Both | Yes | N/A |
+**Step 1: Choose Monitor Type**
+| Option | Description |
+|--------|-------------|
+| Personal Monitor | Track spots for your callsign (requires valid amateur radio callsign) |
+| Global Monitor | Network-wide propagation statistics (no callsign needed) |
+
+**Step 2: Personal Monitor Only**
+| Option | Description |
+|--------|-------------|
+| Callsign | Your amateur radio callsign (e.g., W1AW, KD5QLM/P) |
+| Direction | RX (being heard), TX (hearing others), or Both |
+
+**Callsign Format:** 1-3 letters/numbers, followed by a digit, then 0-4 characters ending in a letter. Optional `/` suffix allowed (e.g., W1ABC/P for portable).
 
 #### Options (After Setup)
 
+Configure filtering via **Settings > Devices & Services > PSKReporter > Configure**.
+
+**Both Modes:**
 | Option | Description | Default |
 |--------|-------------|---------|
 | Count-Only Mode | Don't store individual spots (reduces memory) | Off |
-| Sample Rate | Process 1 in N messages (1-100) | 10 |
+| Sample Rate | Process 1 in N messages (range: 1-100, where 1 = all) | 10 |
+
+**Personal Mode Only:**
+| Option | Description | Default |
+|--------|-------------|---------|
 | Minimum Distance | Filter spots closer than X km | 0 (disabled) |
 | Maximum Distance | Filter spots farther than X km | 0 (disabled) |
-| Mode Filter | Only show specific digital modes | All |
+| Mode Filter | Only show specific digital modes (FT8, FT4, etc.) | All |
+| Callsign Allow List | Only include spots involving these callsigns (comma-separated) | Empty |
+| Callsign Block List | Exclude spots involving these callsigns (comma-separated) | Empty |
+| Country Allow List | Only include spots from these DXCC codes (comma-separated) | Empty |
+| Country Block List | Exclude spots from these DXCC codes (comma-separated) | Empty |
 
 ### Docker Bridge
 

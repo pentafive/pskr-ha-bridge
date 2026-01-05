@@ -27,10 +27,15 @@ Welcome to the PSKReporter HA Bridge wiki!
 
 ### Monitor Modes
 
+The setup wizard asks you to choose a monitor type first:
+
 | Mode | Callsign | Use Case |
 |------|----------|----------|
 | Personal | Required | Track your spots (RX, TX, or both) |
-| Global | Empty | Monitor PSKReporter-wide activity |
+| Global | Not needed | Monitor PSKReporter-wide activity |
+
+**Personal Mode** then asks for your callsign and direction (RX/TX/Both).
+**Global Mode** skips straight to completion - no callsign needed.
 
 ## Sensors Overview
 
