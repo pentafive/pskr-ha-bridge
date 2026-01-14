@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Callsign Filtering (HACS)** - Allow/block lists for callsigns, ported from Docker bridge
 - **Country Filtering (HACS)** - Allow/block lists for DXCC country codes, ported from Docker bridge
 - Options flow now supports comma-separated input for callsign and country filters
+- **Home Assistant Brand Registration** - Official icon now appears in HA integrations list ([PR #8971](https://github.com/home-assistant/brands/pull/8971))
 
 ### Changed
 - All version references updated to 2.1.0
