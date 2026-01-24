@@ -1,0 +1,128 @@
+# PSKReporter Antenna Comparison Dashboard (HACS Integration)
+#
+# Purpose: Compare reception performance between two stations/antennas
+#
+# Requirements:
+# - pskr-ha-bridge HACS integration with TWO personal monitors configured
+# - HACS custom cards: mushroom, apexcharts-card
+#
+# Installation:
+# 1. Replace {callsign_a} and {callsign_b} with your callsigns in lowercase
+#    Example: kd5qlm vs kj5iuy
+# 2. Replace {CALLSIGN_A} and {CALLSIGN_B} with display names (uppercase)
+# 3. Copy this YAML into a new dashboard or view
+#
+# Use case: Compare different antennas at same location, or same antenna
+# at different locations, to measure relative performance.
+
+type: vertical-stack
+cards:
+  # Header
+  - type: custom:mushroom-title-card
+    title: Antenna Comparison
+    subtitle: "{CALLSIGN_A} vs {CALLSIGN_B}"
+
+  # Side-by-side stat comparison
+  - type: horizontal-stack
+    cards:
+      - type: entities
+        title: "{CALLSIGN_A}"
+        entities:
+          - entity: sensor.pskreporter_{callsign_a}_total_spots
+            name: Total Spots
+          - entity: sensor.pskreporter_{callsign_a}_average_snr
+            name: Avg SNR
+          - entity: sensor.pskreporter_{callsign_a}_maximum_distance
+            name: Max Distance
+          - entity: sensor.pskreporter_{callsign_a}_unique_stations
+            name: Unique Stations
+          - entity: sensor.pskreporter_{callsign_a}_spots_per_minute
+            name: Spots/Min
+      - type: entities
+        title: "{CALLSIGN_B}"
+        entities:
+          - entity: sensor.pskreporter_{callsign_b}_total_spots
+            name: Total Spots
+          - entity: sensor.pskreporter_{callsign_b}_average_snr
+            name: Avg SNR
+          - entity: sensor.pskreporter_{callsign_b}_maximum_distance
+            name: Max Distance
+          - entity: sensor.pskreporter_{callsign_b}_unique_stations
+            name: Unique Stations
+          - entity: sensor.pskreporter_{callsign_b}_spots_per_minute
+            name: Spots/Min
+
+  # Dual-line spot count comparison
+  - type: custom:apexcharts-card
+    header:
+      title: Spot Count Comparison (24h)
+      show: true
+    graph_span: 24h
+    series:
+      - entity: sensor.pskreporter_{callsign_a}_total_spots
+        name: "{CALLSIGN_A}"
+        color: "#1E88E5"
+        stroke_width: 2
+      - entity: sensor.pskreporter_{callsign_b}_total_spots
+        name: "{CALLSIGN_B}"
+        color: "#FFA726"
+        stroke_width: 2
+
+  # Dual-line SNR quality comparison
+  - type: custom:apexcharts-card
+    header:
+      title: SNR Quality Comparison (24h)
+      show: true
+    graph_span: 24h
+    yaxis:
+      - min: -20
+        max: 0
+    series:
+      - entity: sensor.pskreporter_{callsign_a}_average_snr
+        name: "{CALLSIGN_A}"
+        color: "#1E88E5"
+        stroke_width: 2
+      - entity: sensor.pskreporter_{callsign_b}_average_snr
+        name: "{CALLSIGN_B}"
+        color: "#FFA726"
+        stroke_width: 2
+
+  # Rate comparison
+  - type: custom:apexcharts-card
+    header:
+      title: Activity Rate (24h)
+      show: true
+    graph_span: 24h
+    series:
+      - entity: sensor.pskreporter_{callsign_a}_spots_per_minute
+        name: "{CALLSIGN_A}"
+        color: "#1E88E5"
+        stroke_width: 2
+      - entity: sensor.pskreporter_{callsign_b}_spots_per_minute
+        name: "{CALLSIGN_B}"
+        color: "#FFA726"
+        stroke_width: 2
+
+  # Band activity comparison
+  - type: horizontal-stack
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_{callsign_a}_most_active_band
+        name: "{CALLSIGN_A} Band"
+        icon_color: blue
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_{callsign_b}_most_active_band
+        name: "{CALLSIGN_B} Band"
+        icon_color: orange
+
+  # Health status comparison
+  - type: horizontal-stack
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: binary_sensor.pskreporter_{callsign_a}_feed_health
+        name: "{CALLSIGN_A} Health"
+        icon_color: "{{ 'green' if is_state(entity, 'on') else 'red' }}"
+      - type: custom:mushroom-entity-card
+        entity: binary_sensor.pskreporter_{callsign_b}_feed_health
+        name: "{CALLSIGN_B} Health"
+        icon_color: "{{ 'green' if is_state(entity, 'on') else 'red' }}"

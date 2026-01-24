@@ -1,0 +1,146 @@
+# PSKReporter Global Monitor Dashboard (HACS Integration)
+#
+# Purpose: Network-wide propagation overview and band conditions
+#
+# Requirements:
+# - pskr-ha-bridge HACS integration with global monitor configured
+# - HACS custom cards: mushroom, apexcharts-card, mini-graph-card
+#
+# Installation:
+# 1. Copy this YAML into a new dashboard or view
+# 2. No callsign replacement needed - global monitor uses fixed entity names
+#
+# Entity naming: sensor.pskreporter_global_monitor_{sensor_name}
+
+type: vertical-stack
+cards:
+  # Header
+  - type: custom:mushroom-title-card
+    title: PSKReporter Global
+    subtitle: Network-wide Propagation Monitor
+
+  # Top stats row
+  - type: horizontal-stack
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_global_monitor_global_spots
+        name: Messages
+        icon_color: blue
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_global_monitor_global_unique_stations
+        name: Active Stations
+        icon_color: green
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_global_monitor_message_rate
+        name: Rate/min
+        icon_color: orange
+
+  # Band activity chips - quick visual overview
+  - type: custom:mushroom-chips-card
+    chips:
+      - type: entity
+        entity: sensor.pskreporter_global_monitor_20m_activity
+        name: "20m"
+        icon_color: blue
+      - type: entity
+        entity: sensor.pskreporter_global_monitor_40m_activity
+        name: "40m"
+        icon_color: green
+      - type: entity
+        entity: sensor.pskreporter_global_monitor_15m_activity
+        name: "15m"
+        icon_color: orange
+      - type: entity
+        entity: sensor.pskreporter_global_monitor_10m_activity
+        name: "10m"
+        icon_color: red
+      - type: entity
+        entity: sensor.pskreporter_global_monitor_17m_activity
+        name: "17m"
+        icon_color: purple
+
+  # HF Band activity bar chart
+  - type: custom:apexcharts-card
+    header:
+      title: HF Band Activity
+      show: true
+    chart_type: bar
+    series:
+      - entity: sensor.pskreporter_global_monitor_20m_activity
+        name: 20m
+        color: "#1E88E5"
+      - entity: sensor.pskreporter_global_monitor_40m_activity
+        name: 40m
+        color: "#43A047"
+      - entity: sensor.pskreporter_global_monitor_15m_activity
+        name: 15m
+        color: "#FFA726"
+      - entity: sensor.pskreporter_global_monitor_10m_activity
+        name: 10m
+        color: "#E53935"
+      - entity: sensor.pskreporter_global_monitor_17m_activity
+        name: 17m
+        color: "#8E24AA"
+      - entity: sensor.pskreporter_global_monitor_30m_activity
+        name: 30m
+        color: "#00ACC1"
+
+  # LF/MF/VHF bands (secondary)
+  - type: custom:apexcharts-card
+    header:
+      title: LF/MF/VHF Band Activity
+      show: true
+    chart_type: bar
+    series:
+      - entity: sensor.pskreporter_global_monitor_160m_activity
+        name: 160m
+        color: "#795548"
+      - entity: sensor.pskreporter_global_monitor_80m_activity
+        name: 80m
+        color: "#607D8B"
+      - entity: sensor.pskreporter_global_monitor_12m_activity
+        name: 12m
+        color: "#FF5722"
+      - entity: sensor.pskreporter_global_monitor_6m_activity
+        name: 6m
+        color: "#9C27B0"
+
+  # Message rate trend
+  - type: custom:mini-graph-card
+    name: Message Rate (24h)
+    entities:
+      - entity: sensor.pskreporter_global_monitor_message_rate
+        name: Messages/min
+    hours_to_show: 24
+    line_width: 2
+    show:
+      labels: true
+      points: false
+
+  # Bottom info row
+  - type: horizontal-stack
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_global_monitor_most_active_band_global
+        name: Top Band
+        icon_color: amber
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_global_monitor_most_active_mode_global
+        name: Top Mode
+        icon_color: teal
+
+  # Health status row
+  - type: horizontal-stack
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_global_monitor_connection_status
+        name: Connection
+        icon_color: "{{ 'green' if is_state(entity, 'Connected') else 'red' }}"
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_global_monitor_feed_status
+        name: Feed Status
+        icon_color: "{{ 'green' if 'Healthy' in states(entity) else 'orange' }}"
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_global_monitor_connection_uptime
+        name: Uptime
+        icon_color: grey

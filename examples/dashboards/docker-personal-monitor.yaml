@@ -1,11 +1,14 @@
 # PSKReporter Dashboard Example (Docker/MQTT Mode)
 #
+# NOTE: This dashboard uses Docker bridge entity names (sensor.pskr_stats_rx_*).
+# If you're using the HACS integration, use personal-monitor.yaml instead.
+#
 # Requirements:
-# - pskr-ha-bridge running in Docker mode
+# - pskr-ha-bridge running in Docker mode (NOT HACS integration)
 # - HACS custom cards: mushroom, mini-graph-card
 # - Replace KD5QLM with your callsign
 #
-# Screenshot: TODO (pending beta deployment)
+# Entity pattern: sensor.pskr_stats_rx_{callsign}_{metric}
 
 title: PSKr Insights (KD5QLM)
 path: pskr-insights

@@ -1,0 +1,108 @@
+# PSKReporter Personal Monitor Dashboard (HACS Integration)
+#
+# Requirements:
+# - pskr-ha-bridge HACS integration configured with personal monitor
+# - HACS custom cards: mushroom, mini-graph-card
+#
+# Installation:
+# 1. Replace all occurrences of {callsign} with your callsign in lowercase
+#    Example: kd5qlm, w1abc
+# 2. Copy this YAML into a new dashboard or view
+#
+# Entity naming: sensor.pskreporter_{callsign}_{sensor_name}
+
+type: vertical-stack
+cards:
+  # Header with title
+  - type: custom:mushroom-title-card
+    title: PSKReporter - {CALLSIGN}
+    subtitle: Amateur Radio Reception Monitor
+
+  # Top row - Key stats
+  - type: horizontal-stack
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_{callsign}_total_spots
+        name: Total Spots
+        icon_color: blue
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_{callsign}_unique_stations
+        name: Unique Stations
+        icon_color: green
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_{callsign}_spots_per_minute
+        name: Spots/Min
+        icon_color: orange
+
+  # Second row - Signal quality
+  - type: horizontal-stack
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_{callsign}_average_snr
+        name: Average SNR
+        icon_color: purple
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_{callsign}_maximum_distance
+        name: Max Distance
+        icon_color: cyan
+
+  # Activity graph - 24h spot trend
+  - type: custom:mini-graph-card
+    name: Spot Activity (24h)
+    entities:
+      - entity: sensor.pskreporter_{callsign}_total_spots
+        name: Spots
+    hours_to_show: 24
+    points_per_hour: 4
+    line_width: 2
+    show:
+      labels: true
+      points: false
+      legend: false
+
+  # SNR trend with thresholds
+  - type: custom:mini-graph-card
+    name: SNR Quality (24h)
+    entities:
+      - entity: sensor.pskreporter_{callsign}_average_snr
+        name: SNR
+    hours_to_show: 24
+    line_width: 2
+    color_thresholds:
+      - value: -15
+        color: "#F44336"
+      - value: -10
+        color: "#FFC107"
+      - value: -5
+        color: "#4CAF50"
+    show:
+      labels: true
+      points: false
+
+  # Bottom row - Band and Mode info
+  - type: horizontal-stack
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_{callsign}_most_active_band
+        name: Active Band
+        icon_color: amber
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_{callsign}_most_active_mode
+        name: Active Mode
+        icon_color: teal
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_{callsign}_last_spot_time
+        name: Last Spot
+        icon_color: grey
+
+  # Health status row
+  - type: horizontal-stack
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_{callsign}_connection_status
+        name: Connection
+        icon_color: "{{ 'green' if is_state(entity, 'Connected') else 'red' }}"
+      - type: custom:mushroom-entity-card
+        entity: sensor.pskreporter_{callsign}_feed_status
+        name: Feed Status
+        icon_color: "{{ 'green' if 'Healthy' in states(entity) else 'orange' }}"
