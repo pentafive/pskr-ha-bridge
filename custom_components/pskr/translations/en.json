@@ -129,6 +129,48 @@
       },
       "band_activity": {
         "name": "{band} Activity"
+      },
+      "min_distance": {
+        "name": "Min Distance"
+      },
+      "avg_distance": {
+        "name": "Avg Distance"
+      },
+      "min_snr": {
+        "name": "Min SNR"
+      },
+      "max_snr": {
+        "name": "Max SNR"
+      },
+      "unique_countries": {
+        "name": "Unique Countries"
+      },
+      "farthest_station": {
+        "name": "Farthest Station"
+      },
+      "spots_last_hour": {
+        "name": "Spots (1h)"
+      },
+      "dx_ratio": {
+        "name": "DX Ratio"
+      },
+      "propagation_score": {
+        "name": "Propagation Score"
+      },
+      "band_spots": {
+        "name": "{band} Spots"
+      },
+      "band_avg_snr": {
+        "name": "{band} Avg SNR"
+      },
+      "band_max_distance": {
+        "name": "{band} Max Distance"
+      },
+      "band_unique_stations": {
+        "name": "{band} Stations"
+      },
+      "band_unique_countries": {
+        "name": "{band} Countries"
       }
     },
     "binary_sensor": {

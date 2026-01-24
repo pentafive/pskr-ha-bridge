@@ -24,20 +24,6 @@ For the full dashboard experience, install these cards from HACS:
 
 ---
 
-## Complete Dashboard Files
-
-Ready-to-use dashboard YAML files are available in [`examples/dashboards/`](../../examples/dashboards/):
-
-| Dashboard | File | Purpose |
-|-----------|------|---------|
-| Personal Monitor | [`personal-monitor.yaml`](../../examples/dashboards/personal-monitor.yaml) | Single station monitoring |
-| Global Monitor | [`global-monitor.yaml`](../../examples/dashboards/global-monitor.yaml) | Network-wide propagation |
-| Antenna Comparison | [`antenna-comparison.yaml`](../../examples/dashboards/antenna-comparison.yaml) | Compare two stations |
-
-Replace `{callsign}` with your callsign in lowercase (e.g., `w1abc`, `kd5qlm`).
-
----
-
 ## Personal Monitor Cards
 
 ### Basic Entities Card
@@ -145,6 +131,110 @@ cards:
     show:
       labels: true
       points: false
+```
+
+### v2.3.0 Extended Stats Card
+
+```yaml
+type: entities
+title: Extended Propagation Stats
+entities:
+  - entity: sensor.pskreporter_w1abc_farthest_station
+    name: Farthest Station
+  - entity: sensor.pskreporter_w1abc_unique_countries
+    name: Countries Worked
+  - entity: sensor.pskreporter_w1abc_dx_ratio
+    name: DX Ratio (>5000km)
+  - entity: sensor.pskreporter_w1abc_propagation_score
+    name: Propagation Score
+  - entity: sensor.pskreporter_w1abc_spots_last_hour
+    name: Spots (1h)
+  - type: section
+    label: Distance Range
+  - entity: sensor.pskreporter_w1abc_min_distance
+  - entity: sensor.pskreporter_w1abc_avg_distance
+  - entity: sensor.pskreporter_w1abc_maximum_distance
+  - type: section
+    label: SNR Range
+  - entity: sensor.pskreporter_w1abc_min_snr
+  - entity: sensor.pskreporter_w1abc_average_snr
+  - entity: sensor.pskreporter_w1abc_max_snr
+```
+
+### Per-Band Overview (v2.3.0)
+
+```yaml
+type: entities
+title: Per-Band Statistics
+entities:
+  - entity: sensor.pskreporter_w1abc_20m_spots
+    name: 20m Spots
+  - entity: sensor.pskreporter_w1abc_20m_avg_snr
+    name: 20m Avg SNR
+  - entity: sensor.pskreporter_w1abc_20m_max_distance
+    name: 20m Max Distance
+  - entity: sensor.pskreporter_w1abc_20m_unique_countries
+    name: 20m Countries
+  - type: section
+    label: 40m
+  - entity: sensor.pskreporter_w1abc_40m_spots
+  - entity: sensor.pskreporter_w1abc_40m_avg_snr
+  - entity: sensor.pskreporter_w1abc_40m_max_distance
+  - entity: sensor.pskreporter_w1abc_40m_unique_countries
+```
+
+### Band Activity Bar Chart (Personal - v2.3.0)
+
+Requires [apexcharts-card](https://github.com/RomRider/apexcharts-card):
+
+```yaml
+type: custom:apexcharts-card
+header:
+  title: My Band Activity
+  show: true
+chart_type: bar
+series:
+  - entity: sensor.pskreporter_w1abc_20m_spots
+    name: 20m
+    color: "#1E88E5"
+  - entity: sensor.pskreporter_w1abc_40m_spots
+    name: 40m
+    color: "#43A047"
+  - entity: sensor.pskreporter_w1abc_15m_spots
+    name: 15m
+    color: "#FFA726"
+  - entity: sensor.pskreporter_w1abc_10m_spots
+    name: 10m
+    color: "#E53935"
+  - entity: sensor.pskreporter_w1abc_17m_spots
+    name: 17m
+    color: "#8E24AA"
+```
+
+### DX Ratio & Propagation Score Gauge
+
+```yaml
+type: horizontal-stack
+cards:
+  - type: gauge
+    entity: sensor.pskreporter_w1abc_dx_ratio
+    name: DX Ratio
+    unit: "%"
+    min: 0
+    max: 100
+    severity:
+      green: 50
+      yellow: 25
+      red: 0
+  - type: gauge
+    entity: sensor.pskreporter_w1abc_propagation_score
+    name: Propagation
+    min: 0
+    max: 1000
+    severity:
+      green: 500
+      yellow: 200
+      red: 0
 ```
 
 ---
@@ -412,12 +502,12 @@ If you're migrating from the Docker/MQTT bridge to the HACS integration, use thi
 | `sensor.pskr_stats_rx_{call}_most_active_mode` | `sensor.pskreporter_{call}_most_active_mode` | ✅ Direct |
 | `sensor.pskr_stats_rx_{call}_total_max_dist` | `sensor.pskreporter_{call}_maximum_distance` | ✅ Renamed |
 | `sensor.pskr_stats_rx_{call}_total_avg_snr` | `sensor.pskreporter_{call}_average_snr` | ✅ Renamed |
-| `sensor.pskr_stats_rx_{call}_total_unique_countries` | N/A | ❌ Not available |
+| `sensor.pskr_stats_rx_{call}_total_unique_countries` | `sensor.pskreporter_{call}_unique_countries` | ✅ v2.3.0 |
 | `sensor.pskr_stats_rx_{call}_active_bands` | `sensor.pskreporter_{call}_most_active_band` (attr: band_counts) | ⚠️ Attribute only |
-| `sensor.pskr_stats_rx_{call}_total_avg_dist` | N/A | ❌ Not available |
-| `sensor.pskr_stats_rx_{call}_total_min_dist` | N/A | ❌ Not available |
-| `sensor.pskr_stats_rx_{call}_total_max_snr` | N/A | ❌ Not available |
-| `sensor.pskr_stats_rx_{call}_total_min_snr` | N/A | ❌ Not available |
+| `sensor.pskr_stats_rx_{call}_total_avg_dist` | `sensor.pskreporter_{call}_avg_distance` | ✅ v2.3.0 |
+| `sensor.pskr_stats_rx_{call}_total_min_dist` | `sensor.pskreporter_{call}_min_distance` | ✅ v2.3.0 |
+| `sensor.pskr_stats_rx_{call}_total_max_snr` | `sensor.pskreporter_{call}_max_snr` | ✅ v2.3.0 |
+| `sensor.pskr_stats_rx_{call}_total_min_snr` | `sensor.pskreporter_{call}_min_snr` | ✅ v2.3.0 |
 
 ### New in HACS (No Docker Equivalent)
 
@@ -433,14 +523,26 @@ If you're migrating from the Docker/MQTT bridge to the HACS integration, use thi
 | `sensor.pskreporter_{call}_connection_uptime` | Connection duration |
 | `sensor.pskreporter_{call}_reconnect_count` | Reconnection counter |
 
-### Missing Features (Consider for Future)
+### v2.3.0 New Sensors
 
-These Docker bridge features are not yet in the HACS integration:
+These sensors were added in v2.3.0 and now have parity with Docker bridge:
 
-- `unique_countries` - Count of DXCC entities (requires DXCC lookup)
-- `avg_distance` / `min_distance` - Distance statistics beyond max
-- `best_snr` / `worst_snr` - SNR range tracking
-- `active_bands` count - Currently only most_active_band available
+| Entity | Purpose |
+|--------|---------|
+| `sensor.pskreporter_{call}_unique_countries` | DXCC country count (list in attributes) |
+| `sensor.pskreporter_{call}_min_distance` | Minimum distance in window |
+| `sensor.pskreporter_{call}_avg_distance` | Average distance in window |
+| `sensor.pskreporter_{call}_min_snr` | Weakest signal in window |
+| `sensor.pskreporter_{call}_max_snr` | Strongest signal in window |
+| `sensor.pskreporter_{call}_farthest_station` | Callsign of farthest contact |
+| `sensor.pskreporter_{call}_spots_last_hour` | Hourly spot count |
+| `sensor.pskreporter_{call}_dx_ratio` | Percentage of spots > 5000 km |
+| `sensor.pskreporter_{call}_propagation_score` | Composite quality metric |
+| `sensor.pskreporter_{call}_{band}_spots` | Per-band spot counts (160m-6m) |
+| `sensor.pskreporter_{call}_{band}_avg_snr` | Per-band average SNR |
+| `sensor.pskreporter_{call}_{band}_max_distance` | Per-band maximum distance |
+| `sensor.pskreporter_{call}_{band}_unique_stations` | Per-band unique stations |
+| `sensor.pskreporter_{call}_{band}_unique_countries` | Per-band unique countries |
 
 ---
 

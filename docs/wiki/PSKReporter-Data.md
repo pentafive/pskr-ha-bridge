@@ -31,10 +31,19 @@
 | Parameter | Value |
 |-----------|-------|
 | Host | mqtt.pskreporter.info |
-| Port | 1886 (WebSocket TLS) |
-| Protocol | MQTT over WebSocket with TLS |
 | Authentication | None required |
 | QoS | 0 (at most once) |
+
+### Transport Options (v2.2.0+)
+
+| Transport | Port | Protocol | Notes |
+|-----------|------|----------|-------|
+| WebSocket + TLS | 1886 | WSS | Default, most firewall-friendly |
+| TCP + TLS | 1884 | MQTTS | Good alternative |
+| WebSocket | 1885 | WS | If TLS issues |
+| TCP plain | 1883 | MQTT | Not recommended (unencrypted) |
+
+Configure transport in: Settings > Devices & Services > PSKReporter > Configure
 
 ### Topic Structure
 
@@ -64,8 +73,8 @@ pskr/filter/v2/{band}/{mode}/{sender}/{receiver}/{flow}/{sequence}
   "rc": "VK2XYZ",        // Receiver callsign
   "sl": "FM18",          // Sender grid square
   "rl": "QF56",          // Receiver grid square
-  "sa": "US",            // Sender country code
-  "ra": "AU",            // Receiver country code
+  "sa": "291",           // Sender DXCC entity code
+  "ra": "150",           // Receiver DXCC entity code
   "b": "20m"             // Band
 }
 ```
@@ -89,8 +98,8 @@ pskr/filter/v2/{band}/{mode}/{sender}/{receiver}/{flow}/{sequence}
 |-------|------|-------------|
 | `sl` | Sender Locator | Maidenhead grid square (4 or 6 char) |
 | `rl` | Receiver Locator | Maidenhead grid square (4 or 6 char) |
-| `sa` | Sender Country | ISO country code |
-| `ra` | Receiver Country | ISO country code |
+| `sa` | Sender DXCC | DXCC entity code (e.g., 291=USA, 150=Australia) |
+| `ra` | Receiver DXCC | DXCC entity code (e.g., 291=USA, 150=Australia) |
 
 ### Metadata
 

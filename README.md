@@ -80,11 +80,25 @@ For container deployment or MQTT-based integration:
 | **Activity** | Total Spots | Spots in last 15 minutes | spots |
 | **Activity** | Unique Stations | Distinct callsigns | stations |
 | **Activity** | Spots per Minute | Current activity rate | spots/min |
+| **Activity** | Spots (1h) | Spots in last hour | spots |
 | **Activity** | Last Spot Time | When last spot received | timestamp |
 | **Propagation** | Most Active Band | Band with most spots | band |
 | **Propagation** | Most Active Mode | Mode with most spots | mode |
 | **Propagation** | Maximum Distance | Furthest spot | km |
+| **Propagation** | Min Distance | Closest spot | km |
+| **Propagation** | Avg Distance | Mean distance | km |
 | **Propagation** | Average SNR | Mean signal-to-noise | dB |
+| **Propagation** | Min SNR | Weakest signal | dB |
+| **Propagation** | Max SNR | Strongest signal | dB |
+| **Geographic** | Unique Countries | DXCC countries worked | countries |
+| **Geographic** | Farthest Station | Callsign of farthest contact | callsign |
+| **Derived** | DX Ratio | % of spots > 5000 km | % |
+| **Derived** | Propagation Score | Composite quality metric | score |
+| **Per-Band** | {band} Spots | Spot count on each HF band (160m-6m) | spots |
+| **Per-Band** | {band} Avg SNR | Average SNR per band | dB |
+| **Per-Band** | {band} Max Distance | Farthest spot per band | km |
+| **Per-Band** | {band} Stations | Unique stations per band | stations |
+| **Per-Band** | {band} Countries | Unique countries per band | countries |
 | **Connection** | Connection Status | MQTT connected | Connected/Disconnected |
 | **Health** | Feed Status | Data flowing | Healthy/Unhealthy |
 | **Health** | Message Rate | MQTT messages/min | msg/min |
@@ -93,6 +107,8 @@ For container deployment or MQTT-based integration:
 | **Health** | Reconnect Count | Connection restarts | count |
 | **Health** | Sequence Gaps | Missed messages detected | count |
 | **Health** | Parse Errors | Malformed messages | count |
+
+**v2.3.0:** Personal mode now includes 75 sensors total (9 activity + 9 extended + 7 health + 50 per-band).
 
 ### Global Monitor Sensors
 

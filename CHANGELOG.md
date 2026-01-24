@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-01-24
+
+### Added
+- **Extended Distance Stats** - New sensors: `min_distance`, `avg_distance` for distance range analysis
+- **SNR Range Sensors** - New sensors: `min_snr`, `max_snr` showing signal quality range
+- **Geographic Tracking** - `unique_countries` sensor with DXCC country list attribute
+- **Farthest Station** - `farthest_station` sensor showing the callsign of the most distant contact with distance attribute
+- **Temporal Metrics** - `spots_last_hour` sensor for hourly activity tracking
+- **DX Ratio** - `dx_ratio` sensor showing percentage of spots beyond 5000 km
+- **Propagation Score** - `propagation_score` composite metric (spots × countries × distance/1000)
+- **Per-Band Statistics (Personal Mode)** - 50 new sensors (10 HF bands × 5 metrics):
+  - `{band}_spots` - Spot count per band
+  - `{band}_avg_snr` - Average SNR per band
+  - `{band}_max_distance` - Maximum distance per band
+  - `{band}_unique_stations` - Unique stations per band
+  - `{band}_unique_countries` - Unique countries per band
+
+### Changed
+- **Sensor Count** - Personal mode now has 75 sensors (was 16), Global unchanged at 22
+- **Per-Band Attributes** - Band sensors include contextual attributes (dominant_mode, countries list, SNR range)
+
+### Technical
+- Added `BandStats` dataclass for per-band statistics
+- Extended `PSKReporterData` with 14 new fields
+- Added `PSKReporterPersonalBandSensor` class for per-band metrics
+- Added `DX_THRESHOLD_KM` constant (5000 km)
+
+---
+
 ## [2.2.0] - 2026-01-23
 
 ### Added

@@ -85,6 +85,9 @@ FEED_HEALTHY_THRESHOLD_PERSONAL: Final = 300  # 5 minutes for personal callsign 
 FEED_HEALTHY_THRESHOLD_GLOBAL: Final = 60  # 1 minute for global (high volume)
 FEED_LOW_ACTIVITY_THRESHOLD: Final = 180  # 3 minutes = low activity warning
 
+# DX threshold for ratio calculation (v2.3.0)
+DX_THRESHOLD_KM: Final = 5000  # Spots beyond this are considered DX
+
 # Amateur radio band definitions (MHz)
 BAND_MAPPING: Final = {
     "160m": (1.8, 2.0),

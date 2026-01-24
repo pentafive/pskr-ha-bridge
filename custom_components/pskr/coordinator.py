@@ -41,10 +41,12 @@ from .const import (
     DIRECTION_RX,
     DIRECTION_TX,
     DOMAIN,
+    DX_THRESHOLD_KM,
     FEED_HEALTHY_THRESHOLD_GLOBAL,
     FEED_HEALTHY_THRESHOLD_PERSONAL,
     FEED_LOW_ACTIVITY_THRESHOLD,
     GLOBAL_TOPICS,
+    HF_BANDS,
     MONITOR_GLOBAL,
     MONITOR_PERSONAL,
     PSK_BROKER,
@@ -79,6 +81,22 @@ class SpotData:
     sender_azimuth: int = 0  # Bearing from sender to receiver
     receiver_azimuth: int = 0  # Bearing from receiver to sender
     sequence: int = 0  # Sequence number for gap detection
+
+
+@dataclass
+class BandStats:
+    """Per-band statistics (v2.3.0)."""
+
+    spots: int = 0
+    unique_stations: int = 0
+    avg_snr: float = 0.0
+    min_snr: int = 0
+    max_snr: int = 0
+    avg_distance_km: float = 0.0
+    max_distance_km: float = 0.0
+    unique_countries: int = 0
+    dominant_mode: str = "Unknown"
+    countries_list: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -138,6 +156,26 @@ class PSKReporterData:
     sample_rate: int = 1
     processed_messages: int = 0
     global_unique_stations: int = 0
+
+    # Extended stats (v2.3.0)
+    min_distance_km: float = 0.0
+    avg_distance_km: float = 0.0
+    min_snr: int = 0
+    max_snr: int = 0
+    unique_countries: int = 0
+    countries_list: list[str] = field(default_factory=list)
+    farthest_station: str = ""
+    farthest_station_distance: float = 0.0
+
+    # Per-band breakdown (v2.3.0)
+    band_stats: dict[str, BandStats] = field(default_factory=dict)
+
+    # Temporal metrics (v2.3.0)
+    spots_last_hour: int = 0
+
+    # Derived metrics (v2.3.0)
+    dx_ratio: float = 0.0  # % spots > DX_THRESHOLD_KM
+    propagation_score: int = 0  # composite metric
 
 
 class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
@@ -670,28 +708,127 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         unique_stations: set[str] = set()
         band_counts: dict[str, int] = defaultdict(int)
         mode_counts: dict[str, int] = defaultdict(int)
+        countries: set[str] = set()
         total_snr = 0
         max_distance = 0.0
+        farthest_spot: SpotData | None = None
+
+        # Per-band data collection (v2.3.0)
+        band_spots: dict[str, list[SpotData]] = defaultdict(list)
 
         for spot in recent_spots:
             if self._direction == DIRECTION_TX:
                 unique_stations.add(spot.receiver_callsign)
+                # Track receiver country for TX mode
+                if spot.receiver_dxcc:
+                    countries.add(spot.receiver_dxcc)
             else:
                 unique_stations.add(spot.sender_callsign)
+                # Track sender country for RX mode
+                if spot.sender_dxcc:
+                    countries.add(spot.sender_dxcc)
 
             # Use band from spot (now populated from payload or calculated)
             band = spot.band if spot.band else self._get_band_from_frequency(spot.frequency)
             band_counts[band] += 1
             mode_counts[spot.mode] += 1
             total_snr += spot.snr
+
+            # Track farthest spot
             if spot.distance_km > max_distance:
                 max_distance = spot.distance_km
+                farthest_spot = spot
+
+            # Collect spots by band for per-band stats
+            band_spots[band].append(spot)
 
         most_active_band = max(band_counts, key=band_counts.get) if band_counts else "Unknown"
         most_active_mode = max(mode_counts, key=mode_counts.get) if mode_counts else "Unknown"
         avg_snr = total_snr / len(recent_spots) if recent_spots else 0
         time_range_minutes = self._stats_window / 60
         spots_per_minute = len(recent_spots) / time_range_minutes if time_range_minutes > 0 else 0
+
+        # Extended distance stats (v2.3.0)
+        distances = [s.distance_km for s in recent_spots if s.distance_km > 0]
+        min_distance = min(distances) if distances else 0.0
+        avg_distance = sum(distances) / len(distances) if distances else 0.0
+
+        # SNR range (v2.3.0)
+        snrs = [s.snr for s in recent_spots]
+        min_snr = min(snrs) if snrs else 0
+        max_snr = max(snrs) if snrs else 0
+
+        # Farthest station details (v2.3.0)
+        farthest_station = ""
+        farthest_station_distance = 0.0
+        if farthest_spot:
+            if self._direction == DIRECTION_TX:
+                farthest_station = farthest_spot.receiver_callsign
+            else:
+                farthest_station = farthest_spot.sender_callsign
+            farthest_station_distance = farthest_spot.distance_km
+
+        # Country list (v2.3.0)
+        countries_list = sorted(countries)
+        unique_countries = len(countries)
+
+        # DX ratio - percentage of spots > DX_THRESHOLD_KM (v2.3.0)
+        dx_spots = sum(1 for s in recent_spots if s.distance_km > DX_THRESHOLD_KM)
+        dx_ratio = (dx_spots / len(recent_spots) * 100) if recent_spots else 0.0
+
+        # Spots in last hour (v2.3.0)
+        hour_cutoff = time.time() - 3600
+        spots_last_hour = sum(1 for s in self._spots if s.timestamp > hour_cutoff)
+
+        # Propagation score - composite metric (v2.3.0)
+        # Formula: spots × unique_countries × (max_distance / 1000)
+        propagation_score = int(
+            len(recent_spots) * unique_countries * (max_distance / 1000)
+        ) if max_distance > 0 else 0
+
+        # Per-band statistics (v2.3.0)
+        band_stats: dict[str, BandStats] = {}
+        for band in HF_BANDS:
+            spots_in_band = band_spots.get(band, [])
+            if not spots_in_band:
+                band_stats[band] = BandStats()
+                continue
+
+            # Calculate per-band metrics
+            band_snrs = [s.snr for s in spots_in_band]
+            band_distances = [s.distance_km for s in spots_in_band if s.distance_km > 0]
+            band_stations: set[str] = set()
+            band_countries: set[str] = set()
+            band_mode_counts: dict[str, int] = defaultdict(int)
+
+            for spot in spots_in_band:
+                if self._direction == DIRECTION_TX:
+                    band_stations.add(spot.receiver_callsign)
+                    if spot.receiver_dxcc:
+                        band_countries.add(spot.receiver_dxcc)
+                else:
+                    band_stations.add(spot.sender_callsign)
+                    if spot.sender_dxcc:
+                        band_countries.add(spot.sender_dxcc)
+                band_mode_counts[spot.mode] += 1
+
+            band_dominant_mode = (
+                max(band_mode_counts, key=band_mode_counts.get)
+                if band_mode_counts else "Unknown"
+            )
+
+            band_stats[band] = BandStats(
+                spots=len(spots_in_band),
+                unique_stations=len(band_stations),
+                avg_snr=round(sum(band_snrs) / len(band_snrs), 1) if band_snrs else 0.0,
+                min_snr=min(band_snrs) if band_snrs else 0,
+                max_snr=max(band_snrs) if band_snrs else 0,
+                avg_distance_km=round(sum(band_distances) / len(band_distances), 1) if band_distances else 0.0,
+                max_distance_km=max(band_distances) if band_distances else 0.0,
+                unique_countries=len(band_countries),
+                dominant_mode=band_dominant_mode,
+                countries_list=sorted(band_countries),
+            )
 
         return PSKReporterData(
             spots=self._spots,
@@ -708,6 +845,19 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
             connected=self._connected,
             health=health,
             monitor_type=self._monitor_type,
+            # Extended stats (v2.3.0)
+            min_distance_km=round(min_distance, 1),
+            avg_distance_km=round(avg_distance, 1),
+            min_snr=min_snr,
+            max_snr=max_snr,
+            unique_countries=unique_countries,
+            countries_list=countries_list,
+            farthest_station=farthest_station,
+            farthest_station_distance=round(farthest_station_distance, 1),
+            band_stats=band_stats,
+            spots_last_hour=spots_last_hour,
+            dx_ratio=round(dx_ratio, 1),
+            propagation_score=propagation_score,
         )
 
     async def _async_update_data(self) -> PSKReporterData:

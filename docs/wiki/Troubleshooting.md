@@ -124,8 +124,8 @@ logger:
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| brands | Brand not in HA brands repo | Wait for PR merge or use without |
-| topics | Missing repo topics | Already fixed in v2.0.0 |
+| brands | Brand not in HA brands repo | Fixed - PR #8971 merged |
+| topics | Missing repo topics | Fixed in v2.0.0 |
 
 ## Docker Specific Issues
 

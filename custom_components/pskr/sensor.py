@@ -21,7 +21,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import ATTRIBUTION, DOMAIN, HF_BANDS, MONITOR_GLOBAL
-from .coordinator import PSKReporterCoordinator, PSKReporterData
+from .coordinator import BandStats, PSKReporterCoordinator, PSKReporterData
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -196,6 +196,84 @@ HEALTH_SENSOR_DESCRIPTIONS: tuple[PSKReporterSensorEntityDescription, ...] = (
     ),
 )
 
+# Extended sensors for personal mode (v2.3.0)
+EXTENDED_SENSOR_DESCRIPTIONS: tuple[PSKReporterSensorEntityDescription, ...] = (
+    # Distance stats
+    PSKReporterSensorEntityDescription(
+        key="min_distance",
+        translation_key="min_distance",
+        native_unit_of_measurement=UnitOfLength.KILOMETERS,
+        device_class=SensorDeviceClass.DISTANCE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.min_distance_km if data.min_distance_km > 0 else None,
+    ),
+    PSKReporterSensorEntityDescription(
+        key="avg_distance",
+        translation_key="avg_distance",
+        native_unit_of_measurement=UnitOfLength.KILOMETERS,
+        device_class=SensorDeviceClass.DISTANCE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.avg_distance_km if data.avg_distance_km > 0 else None,
+    ),
+    # SNR range
+    PSKReporterSensorEntityDescription(
+        key="min_snr",
+        translation_key="min_snr",
+        native_unit_of_measurement="dB",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.min_snr if data.total_spots > 0 else None,
+    ),
+    PSKReporterSensorEntityDescription(
+        key="max_snr",
+        translation_key="max_snr",
+        native_unit_of_measurement="dB",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.max_snr if data.total_spots > 0 else None,
+    ),
+    # Geographic
+    PSKReporterSensorEntityDescription(
+        key="unique_countries",
+        translation_key="unique_countries",
+        native_unit_of_measurement="countries",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.unique_countries,
+        attr_fn=lambda data: {"countries": data.countries_list},
+    ),
+    PSKReporterSensorEntityDescription(
+        key="farthest_station",
+        translation_key="farthest_station",
+        value_fn=lambda data: data.farthest_station or None,
+        attr_fn=lambda data: {"distance_km": data.farthest_station_distance},
+    ),
+    # Temporal
+    PSKReporterSensorEntityDescription(
+        key="spots_last_hour",
+        translation_key="spots_last_hour",
+        native_unit_of_measurement="spots",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.spots_last_hour,
+    ),
+    # Derived metrics
+    PSKReporterSensorEntityDescription(
+        key="dx_ratio",
+        translation_key="dx_ratio",
+        native_unit_of_measurement="%",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.dx_ratio if data.total_spots > 0 else None,
+        attr_fn=lambda _: {"description": "Percentage of spots beyond 5000 km"},
+    ),
+    PSKReporterSensorEntityDescription(
+        key="propagation_score",
+        translation_key="propagation_score",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.propagation_score,
+        attr_fn=lambda _: {
+            "formula": "spots × countries × (max_distance_km / 1000)",
+            "description": "Composite propagation quality metric",
+        },
+    ),
+)
+
 # Global mode sensors (no callsign - PSKReporter-wide stats)
 GLOBAL_SENSOR_DESCRIPTIONS: tuple[PSKReporterSensorEntityDescription, ...] = (
     PSKReporterSensorEntityDescription(
@@ -259,7 +337,7 @@ async def async_setup_entry(
     """Set up PSKReporter sensors based on a config entry."""
     coordinator: PSKReporterCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    entities: list[PSKReporterSensor] = []
+    entities: list[SensorEntity] = []
 
     if coordinator.monitor_type == MONITOR_GLOBAL:
         # Global mode: add global sensors
@@ -273,6 +351,15 @@ async def async_setup_entry(
         # Personal mode: add main activity sensors
         for description in SENSOR_DESCRIPTIONS:
             entities.append(PSKReporterSensor(coordinator, description))
+
+        # Add extended sensors (v2.3.0)
+        for description in EXTENDED_SENSOR_DESCRIPTIONS:
+            entities.append(PSKReporterSensor(coordinator, description))
+
+        # Add per-band sensors for HF bands (v2.3.0)
+        for band in HF_BANDS:
+            for metric in PERSONAL_BAND_METRICS:
+                entities.append(PSKReporterPersonalBandSensor(coordinator, band, metric))
 
     # Add health sensors for both modes
     for description in HEALTH_SENSOR_DESCRIPTIONS:
@@ -312,7 +399,7 @@ class PSKReporterSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity)
                 name="PSKReporter - Global Monitor",
                 manufacturer="PSKReporter.info",
                 model="PSKReporter HA Bridge (Global)",
-                sw_version="2.2.0",
+                sw_version="2.3.0",
                 configuration_url="https://pskreporter.info",
             )
         return DeviceInfo(
@@ -320,7 +407,7 @@ class PSKReporterSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity)
             name=f"PSKReporter - {self.coordinator.callsign}",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge",
-            sw_version="2.2.0",
+            sw_version="2.3.0",
             configuration_url="https://pskreporter.info",
         )
 
@@ -367,7 +454,7 @@ class PSKReporterBandSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEnt
             name="PSKReporter - Global Monitor",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge (Global)",
-            sw_version="2.2.0",
+            sw_version="2.3.0",
             configuration_url="https://pskreporter.info",
         )
 
@@ -391,3 +478,124 @@ class PSKReporterBandSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEnt
             return 0.0
         band_count = self.coordinator.data.band_counts.get(self._band, 0)
         return round((band_count / total) * 100, 1)
+
+
+# Per-band metric types for personal mode (v2.3.0)
+PERSONAL_BAND_METRICS = {
+    "spots": {
+        "unit": "spots",
+        "state_class": SensorStateClass.MEASUREMENT,
+        "device_class": None,
+        "attr_key": "spots",
+    },
+    "avg_snr": {
+        "unit": "dB",
+        "state_class": SensorStateClass.MEASUREMENT,
+        "device_class": None,
+        "attr_key": "avg_snr",
+    },
+    "max_distance": {
+        "unit": UnitOfLength.KILOMETERS,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "device_class": SensorDeviceClass.DISTANCE,
+        "attr_key": "max_distance_km",
+    },
+    "unique_stations": {
+        "unit": "stations",
+        "state_class": SensorStateClass.MEASUREMENT,
+        "device_class": None,
+        "attr_key": "unique_stations",
+    },
+    "unique_countries": {
+        "unit": "countries",
+        "state_class": SensorStateClass.MEASUREMENT,
+        "device_class": None,
+        "attr_key": "unique_countries",
+    },
+}
+
+
+class PSKReporterPersonalBandSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity):
+    """Sensor for per-band statistics in personal mode (v2.3.0)."""
+
+    _attr_attribution = ATTRIBUTION
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: PSKReporterCoordinator,
+        band: str,
+        metric: str,
+    ) -> None:
+        """Initialize the personal band sensor."""
+        super().__init__(coordinator)
+        self._band = band
+        self._metric = metric
+
+        # Get metric configuration
+        metric_config = PERSONAL_BAND_METRICS.get(metric, {})
+
+        self._attr_unique_id = f"{coordinator.callsign}_{coordinator.direction}_band_{band}_{metric}"
+        self._attr_native_unit_of_measurement = metric_config.get("unit")
+        self._attr_state_class = metric_config.get("state_class")
+        if metric_config.get("device_class"):
+            self._attr_device_class = metric_config["device_class"]
+
+        # Translation key for per-band sensors
+        self._attr_translation_key = f"band_{metric}"
+        self._attr_translation_placeholders = {"band": band}
+        # Fallback name
+        metric_name = metric.replace("_", " ").title()
+        self._attr_name = f"{band} {metric_name}"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device information."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self.coordinator.callsign}_{self.coordinator.direction}")},
+            name=f"PSKReporter - {self.coordinator.callsign}",
+            manufacturer="PSKReporter.info",
+            model="PSKReporter HA Bridge",
+            sw_version="2.3.0",
+            configuration_url="https://pskreporter.info",
+        )
+
+    @property
+    def native_value(self) -> Any:
+        """Return the value for this band and metric."""
+        band_stats: BandStats | None = self.coordinator.data.band_stats.get(self._band)
+        if not band_stats:
+            # Return appropriate default based on metric type
+            if self._metric in ("spots", "unique_stations", "unique_countries"):
+                return 0
+            return None
+
+        # Get the value from band_stats
+        metric_config = PERSONAL_BAND_METRICS.get(self._metric, {})
+        attr_key = metric_config.get("attr_key", self._metric)
+        value = getattr(band_stats, attr_key, None)
+
+        # Return None for zero distances/SNR to indicate no data
+        if self._metric in ("avg_snr", "max_distance") and value == 0:
+            return None
+        return value
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        band_stats: BandStats | None = self.coordinator.data.band_stats.get(self._band)
+        attrs = {"band": self._band, "metric": self._metric}
+
+        if band_stats:
+            # Add relevant context based on metric
+            if self._metric == "spots":
+                attrs["dominant_mode"] = band_stats.dominant_mode
+            elif self._metric == "avg_snr":
+                attrs["min_snr"] = band_stats.min_snr
+                attrs["max_snr"] = band_stats.max_snr
+            elif self._metric == "max_distance":
+                attrs["avg_distance_km"] = band_stats.avg_distance_km
+            elif self._metric == "unique_countries":
+                attrs["countries"] = band_stats.countries_list
+
+        return attrs
