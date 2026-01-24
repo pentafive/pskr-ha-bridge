@@ -171,10 +171,11 @@ card:
   type: markdown
   content: |
     ## ⚠️ PSKReporter Feed Unhealthy
-    No data received for 60+ seconds.
-    - Check network connectivity
-    - Verify PSKReporter status
-    - Review logs for errors
+    No data received beyond threshold (personal: 5min, global: 1min).
+    Check `sensor.pskreporter_w1abc_feed_status` for details:
+    - **Low Activity**: Normal during poor propagation
+    - **Stale**: Check network connectivity
+    - **Disconnected**: Check firewall/transport settings
 ```
 
 ## Automations

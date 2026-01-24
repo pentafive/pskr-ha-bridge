@@ -31,26 +31,30 @@ from .const import (
     CONF_MIN_DISTANCE,
     CONF_MODE_FILTER,
     CONF_SAMPLE_RATE,
+    CONF_TRANSPORT,
     DEFAULT_COUNT_ONLY,
     DEFAULT_SAMPLE_RATE,
     DEFAULT_SPOT_TTL,
     DEFAULT_STATS_WINDOW,
+    DEFAULT_TRANSPORT,
     DIRECTION_DUAL,
     DIRECTION_RX,
     DIRECTION_TX,
     DOMAIN,
+    FEED_HEALTHY_THRESHOLD_GLOBAL,
+    FEED_HEALTHY_THRESHOLD_PERSONAL,
+    FEED_LOW_ACTIVITY_THRESHOLD,
     GLOBAL_TOPICS,
     MONITOR_GLOBAL,
     MONITOR_PERSONAL,
     PSK_BROKER,
-    PSK_PORT_WS_TLS,
+    TRANSPORT_CONFIG,
     UPDATE_INTERVAL,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
-# Health monitoring constants
-FEED_HEALTHY_THRESHOLD = 60  # seconds without messages = unhealthy
+# Health monitoring constants (thresholds now in const.py)
 MESSAGE_RATE_WINDOW = 60  # seconds for rate calculation
 SEQUENCE_GAP_THRESHOLD = 100  # report gaps larger than this
 
@@ -87,12 +91,15 @@ class HealthMetrics:
     reconnect_count: int = 0  # Number of reconnections
     last_disconnect_reason: str = ""
 
-    # Feed health
-    feed_healthy: bool = False  # Is data flowing?
+    # Feed health (v2.2.0: improved with activity-aware thresholds)
+    feed_healthy: bool = False  # Is data flowing? (binary for backwards compat)
+    feed_status: str = "unknown"  # "healthy", "low_activity", "stale", "disconnected"
+    feed_status_reason: str = ""  # Human-readable explanation
     last_message_time: float = 0.0  # When last message received
     feed_latency: float = 0.0  # Seconds since last message
     total_messages: int = 0  # Total messages since startup
     messages_last_minute: int = 0  # Messages in last 60 seconds
+    health_threshold_seconds: int = 60  # Threshold being used (for diagnostics)
 
     # Data quality
     sequence_gaps: int = 0  # Number of detected sequence gaps
@@ -102,6 +109,10 @@ class HealthMetrics:
 
     # Subscription info
     subscribed_topics: list[str] = field(default_factory=list)
+
+    # Transport info (v2.2.0)
+    transport_mode: str = ""  # Current transport mode (e.g., "WS_TLS")
+    transport_port: int = 0  # Port being used
 
 
 @dataclass
@@ -163,6 +174,10 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         self._count_only = entry.options.get(CONF_COUNT_ONLY, DEFAULT_COUNT_ONLY)
         self._sample_rate = entry.options.get(CONF_SAMPLE_RATE, DEFAULT_SAMPLE_RATE)
 
+        # Transport configuration (v2.2.0)
+        self._transport_mode = entry.options.get(CONF_TRANSPORT, DEFAULT_TRANSPORT)
+        self._transport_config = TRANSPORT_CONFIG.get(self._transport_mode, TRANSPORT_CONFIG[DEFAULT_TRANSPORT])
+
         self._spots: list[SpotData] = []
         self._mqtt_client: mqtt.Client | None = None
         self._connected = False
@@ -208,19 +223,37 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
     def _setup_and_connect_mqtt(self) -> None:
         """Set up and connect MQTT client (blocking, runs in executor)."""
         client_id = f"ha_pskr_{self._callsign}" if self._callsign else "ha_pskr_global"
+
+        # Use configured transport (v2.2.0)
+        transport = self._transport_config["transport"]
+        port = self._transport_config["port"]
+        use_tls = self._transport_config["tls"]
+
         self._mqtt_client = mqtt.Client(
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
-            transport="websockets",
+            transport=transport,
             client_id=client_id,
         )
-        self._mqtt_client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
+
+        # Configure TLS if enabled
+        if use_tls:
+            self._mqtt_client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
+
         self._mqtt_client.reconnect_delay_set(min_delay=5, max_delay=120)
 
         self._mqtt_client.on_connect = self._on_connect
         self._mqtt_client.on_disconnect = self._on_disconnect
         self._mqtt_client.on_message = self._on_message
 
-        self._mqtt_client.connect(PSK_BROKER, PSK_PORT_WS_TLS)
+        # Store transport info in health metrics
+        self._health.transport_mode = self._transport_mode
+        self._health.transport_port = port
+
+        _LOGGER.info(
+            "Connecting to PSKReporter via %s (port %d, TLS=%s)",
+            self._transport_mode, port, use_tls
+        )
+        self._mqtt_client.connect(PSK_BROKER, port)
         self._mqtt_client.loop_start()
 
     async def _async_start_mqtt(self) -> None:
@@ -497,7 +530,12 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         self._spots = [s for s in self._spots if s.timestamp > cutoff]
 
     def _calculate_health_metrics(self) -> HealthMetrics:
-        """Calculate current health metrics."""
+        """Calculate current health metrics.
+
+        v2.2.0: Uses monitor-type-specific thresholds:
+        - Personal monitors: 300s threshold (sparse activity is normal)
+        - Global monitors: 60s threshold (high volume expected)
+        """
         now = time.time()
 
         # Connection uptime
@@ -516,15 +554,52 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         cutoff = now - MESSAGE_RATE_WINDOW
         self._health.messages_last_minute = sum(1 for t in self._message_times if t > cutoff)
 
-        # Feed health determination
-        # Feed is healthy if:
-        # 1. We're connected AND
-        # 2. We've received a message in the last FEED_HEALTHY_THRESHOLD seconds
-        self._health.feed_healthy = (
-            self._connected and
-            self._health.last_message_time > 0 and
-            self._health.feed_latency < FEED_HEALTHY_THRESHOLD
-        )
+        # Select threshold based on monitor type (v2.2.0)
+        if self._monitor_type == MONITOR_GLOBAL:
+            healthy_threshold = FEED_HEALTHY_THRESHOLD_GLOBAL
+        else:
+            healthy_threshold = FEED_HEALTHY_THRESHOLD_PERSONAL
+
+        self._health.health_threshold_seconds = healthy_threshold
+
+        # Feed health determination with activity-aware states (v2.2.0)
+        if not self._connected:
+            self._health.feed_status = "disconnected"
+            self._health.feed_status_reason = "Not connected to PSKReporter MQTT"
+            self._health.feed_healthy = False
+        elif self._health.last_message_time == 0:
+            self._health.feed_status = "waiting"
+            self._health.feed_status_reason = "Waiting for first message"
+            self._health.feed_healthy = False
+        elif self._health.feed_latency < FEED_LOW_ACTIVITY_THRESHOLD:
+            # Within low activity threshold = healthy
+            self._health.feed_status = "healthy"
+            self._health.feed_status_reason = "Receiving data normally"
+            self._health.feed_healthy = True
+        elif self._health.feed_latency < healthy_threshold:
+            # Between low activity and healthy threshold = low activity
+            self._health.feed_status = "low_activity"
+            latency_int = int(self._health.feed_latency)
+            if self._monitor_type == MONITOR_GLOBAL:
+                self._health.feed_status_reason = f"Low activity ({latency_int}s since last message)"
+            else:
+                self._health.feed_status_reason = (
+                    f"Low activity ({latency_int}s) - normal during poor propagation"
+                )
+            self._health.feed_healthy = True  # Still considered healthy
+        else:
+            # Beyond healthy threshold = stale
+            self._health.feed_status = "stale"
+            latency_int = int(self._health.feed_latency)
+            if self._monitor_type == MONITOR_GLOBAL:
+                self._health.feed_status_reason = (
+                    f"No messages for {latency_int}s (PSKReporter feed may be down)"
+                )
+            else:
+                self._health.feed_status_reason = (
+                    f"No messages for {latency_int}s - station may be offline or band closed"
+                )
+            self._health.feed_healthy = False
 
         return self._health
 

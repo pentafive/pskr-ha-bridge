@@ -42,13 +42,19 @@ The setup wizard asks you to choose a monitor type first:
 ### Personal Monitor
 - Activity: Total Spots, Unique Stations, Spots/min
 - Propagation: Most Active Band/Mode, Max Distance, Avg SNR
-- Health: Connection Status, Feed Health, Message Rate
+- Health: Connection Status, Feed Status, Message Rate
 
 ### Global Monitor
 - Activity: Global Spots, Global Unique Stations
 - Propagation: Most Active Band/Mode (Global)
 - Per-Band: 160m through 6m activity counts
 - Health: Same as personal
+
+## v2.2.0 Features
+
+- **Activity-Aware Health Thresholds** - Personal monitors use 5-minute threshold (vs 1-minute for global) to reduce false alarms during normal low-activity periods
+- **Granular Feed Status** - States: Healthy, Low Activity, Stale, Disconnected
+- **Configurable Transport** - Choose between WebSocket+TLS (default), TCP+TLS, WebSocket, or TCP via integration options
 
 ## Support
 

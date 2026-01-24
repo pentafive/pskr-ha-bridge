@@ -39,6 +39,7 @@
         "title": "PSKReporter Options",
         "description": "Configure filtering and performance options",
         "data": {
+          "transport": "Connection Transport",
           "count_only": "Count-Only Mode",
           "sample_rate": "Sample Rate",
           "min_distance": "Minimum Distance (km)",
@@ -50,6 +51,7 @@
           "country_block": "Country Block List (DXCC)"
         },
         "data_description": {
+          "transport": "MQTT transport method for connecting to PSKReporter (WebSocket+TLS recommended)",
           "count_only": "Only count spots without storing details (reduces memory usage)",
           "sample_rate": "Process 1 in N messages (higher = less CPU, 1 = all messages)",
           "min_distance": "Only show spots beyond this distance (0 = no minimum)",

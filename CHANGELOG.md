@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-01-23
+
+### Added
+- **Activity-Aware Health Thresholds** - Personal monitors now use 300-second threshold (was 60s), Global monitors keep 60-second threshold
+- **Granular Feed Status** - New states: `healthy`, `low_activity`, `stale`, `disconnected` (replaces binary on/off)
+- **Enhanced Health Attributes** - Feed sensors now expose `feed_status`, `feed_status_reason`, and `health_threshold_seconds`
+- **Configurable Transport Mode** - Choose between WebSocket+TLS (default), TCP+TLS, WebSocket, or TCP plain in integration options
+- **Transport Info in Sensors** - Connection status sensor now shows `transport_mode` and `transport_port` attributes
+
+### Changed
+- **Feed Health Binary Sensor** - Now uses activity-aware thresholds from coordinator instead of hardcoded 60 seconds
+- **Feed Status Sensor** - Shows human-readable status (e.g., "Low Activity") instead of just "Healthy" or "Stale"
+- **Health Reason Messages** - Improved explanations (e.g., "Low activity (normal during low propagation)")
+- **MQTT Connection** - No longer hardcoded to WebSocket+TLS; uses configured transport from options
+
+### Fixed
+- **False Unhealthy Alarms** - Personal callsign monitors no longer show constant "unhealthy" status during normal 1-10 minute gaps between spots
+- **Data Analysis** - Based on 576,951 records over 3 days showing 2,054 false toggles vs only 5 actual disconnects
+
+---
+
 ## [2.1.1] - 2026-01-05
 
 ### Fixed

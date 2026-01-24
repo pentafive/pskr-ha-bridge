@@ -97,6 +97,8 @@ SENSOR_DESCRIPTIONS: tuple[PSKReporterSensorEntityDescription, ...] = (
         translation_key="connection_status",
         value_fn=lambda data: "Connected" if data.connected else "Disconnected",
         attr_fn=lambda data: {
+            "transport_mode": data.health.transport_mode,
+            "transport_port": data.health.transport_port,
             "reconnect_count": data.health.reconnect_count,
             "last_disconnect_reason": data.health.last_disconnect_reason,
             "subscribed_topics": data.health.subscribed_topics,
@@ -110,7 +112,8 @@ HEALTH_SENSOR_DESCRIPTIONS: tuple[PSKReporterSensorEntityDescription, ...] = (
         key="feed_status",
         translation_key="feed_status",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: "Healthy" if data.health.feed_healthy else "Unhealthy",
+        # v2.2.0: Use feed_status for more granular states (healthy, low_activity, stale, etc.)
+        value_fn=lambda data: data.health.feed_status.replace("_", " ").title(),
         attr_fn=lambda data: {
             "last_message_time": (
                 datetime.fromtimestamp(data.health.last_message_time).isoformat()
@@ -118,7 +121,9 @@ HEALTH_SENSOR_DESCRIPTIONS: tuple[PSKReporterSensorEntityDescription, ...] = (
                 else None
             ),
             "feed_latency_seconds": round(data.health.feed_latency, 1),
-            "threshold_seconds": 60,
+            "threshold_seconds": data.health.health_threshold_seconds,
+            "reason": data.health.feed_status_reason,
+            "feed_healthy": data.health.feed_healthy,  # Binary for automations
         },
     ),
     PSKReporterSensorEntityDescription(
@@ -236,6 +241,8 @@ GLOBAL_SENSOR_DESCRIPTIONS: tuple[PSKReporterSensorEntityDescription, ...] = (
         translation_key="connection_status",
         value_fn=lambda data: "Connected" if data.connected else "Disconnected",
         attr_fn=lambda data: {
+            "transport_mode": data.health.transport_mode,
+            "transport_port": data.health.transport_port,
             "reconnect_count": data.health.reconnect_count,
             "last_disconnect_reason": data.health.last_disconnect_reason,
             "subscribed_topics": data.health.subscribed_topics,
@@ -305,7 +312,7 @@ class PSKReporterSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity)
                 name="PSKReporter - Global Monitor",
                 manufacturer="PSKReporter.info",
                 model="PSKReporter HA Bridge (Global)",
-                sw_version="2.1.1",
+                sw_version="2.2.0",
                 configuration_url="https://pskreporter.info",
             )
         return DeviceInfo(
@@ -313,7 +320,7 @@ class PSKReporterSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity)
             name=f"PSKReporter - {self.coordinator.callsign}",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge",
-            sw_version="2.1.1",
+            sw_version="2.2.0",
             configuration_url="https://pskreporter.info",
         )
 
@@ -360,7 +367,7 @@ class PSKReporterBandSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEnt
             name="PSKReporter - Global Monitor",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge (Global)",
-            sw_version="2.1.1",
+            sw_version="2.2.0",
             configuration_url="https://pskreporter.info",
         )
 

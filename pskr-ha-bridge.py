@@ -65,7 +65,7 @@ from config import (
 # ==============================================================================
 # --- Other Global Variables & Constants ---
 # ==============================================================================
-SCRIPT_VERSION = "2.0.0"  # Docker + HACS modernization
+SCRIPT_VERSION = "2.2.0"  # Sync with HACS (health features pending)
 MAX_SPOT_HISTORY = 5000
 
 # --- State Variables ---

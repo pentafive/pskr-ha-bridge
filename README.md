@@ -118,7 +118,7 @@ For container deployment or MQTT-based integration:
 
 | Sensor | Description |
 |--------|-------------|
-| Feed Health | ON when data flowing, OFF when stale (>60s) |
+| Feed Health | ON when data flowing, OFF when stale (personal: >300s, global: >60s) |
 
 ## Understanding the Data
 
@@ -133,13 +133,23 @@ For container deployment or MQTT-based integration:
 
 ### Feed Health
 
-The `feed_health` binary sensor indicates whether PSKReporter data is flowing:
-- **ON (Healthy)**: Messages received within the last 60 seconds
-- **OFF (Unhealthy)**: No messages for 60+ seconds
+The `feed_health` binary sensor and `feed_status` sensor indicate data flow status.
 
-Unhealthy can mean:
+**v2.2.0+:** Activity-aware thresholds reduce false alarms for personal monitors:
+- **Personal Monitor:** 300-second threshold (amateur radio spots are naturally sparse)
+- **Global Monitor:** 60-second threshold (high message volume)
+
+**Feed Status States:**
+| State | Meaning |
+|-------|---------|
+| Healthy | Messages received within threshold |
+| Low Activity | 180-300 seconds since last message (personal only) |
+| Stale | No messages beyond threshold |
+| Disconnected | MQTT connection lost |
+
+**Common reasons for Stale/Disconnected:**
+- Your callsign has no activity (common during off-hours or poor propagation)
 - PSKReporter MQTT feed is down (rare)
-- Your callsign has no activity (common during off-hours)
 - Network connectivity issue
 
 ### Sample Rate (Global Mode)
@@ -181,6 +191,7 @@ Configure filtering via **Settings > Devices & Services > PSKReporter > Configur
 **Both Modes:**
 | Option | Description | Default |
 |--------|-------------|---------|
+| Connection Transport | MQTT transport method (see Transport Options below) | WebSocket+TLS |
 | Count-Only Mode | Don't store individual spots (reduces memory) | Off |
 | Sample Rate | Process 1 in N messages (range: 1-100, where 1 = all) | 10 |
 
@@ -220,7 +231,20 @@ All configuration via environment variables. See `.env.example` for the full lis
 
 ### Data Source
 
-This integration connects to the public PSKReporter MQTT feed at `mqtt.pskreporter.info`. The feed provides real-time spot data as JSON messages over MQTT WebSocket (port 1886, TLS).
+This integration connects to the public PSKReporter MQTT feed at `mqtt.pskreporter.info`.
+
+### Transport Options
+
+**v2.2.0+:** Configurable transport modes for different network environments.
+
+| Transport | Port | Protocol | Recommended |
+|-----------|------|----------|-------------|
+| WebSocket + TLS | 1886 | WSS | ✅ Default, most firewall-friendly |
+| TCP + TLS | 1884 | MQTTS | Good alternative |
+| WebSocket | 1885 | WS | If TLS issues |
+| TCP plain | 1883 | MQTT | Not recommended (unencrypted) |
+
+The `connection_status` sensor shows the active transport mode and port in its attributes.
 
 ### Topic Structure
 
@@ -271,6 +295,6 @@ MIT License - see [LICENSE](LICENSE) for details.
 ## Resources
 
 - [PSKReporter.info](https://pskreporter.info/) - Official PSKReporter website
-- [PSKReporter MQTT Documentation](https://mqtt.pskreporter.info/) - MQTT feed details
+- [PSKReporter MQTT Documentation](http://mqtt.pskreporter.info/) - MQTT feed details
 - [WSJT-X](https://wsjt.sourceforge.io/) - FT8/FT4 software
 - [Home Assistant MQTT Integration](https://www.home-assistant.io/integrations/mqtt/)

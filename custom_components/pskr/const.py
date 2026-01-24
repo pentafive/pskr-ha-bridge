@@ -7,6 +7,7 @@ DOMAIN: Final = "pskr"
 # Configuration keys
 CONF_CALLSIGN: Final = "callsign"
 CONF_DIRECTION: Final = "direction"
+CONF_TRANSPORT: Final = "transport"
 CONF_MIN_DISTANCE: Final = "min_distance"
 CONF_MAX_DISTANCE: Final = "max_distance"
 CONF_COUNTRY_FILTER: Final = "country_filter"
@@ -52,9 +53,20 @@ TRANSPORT_MQTT_TLS: Final = "MQTT_TLS"
 TRANSPORT_WS: Final = "WS"
 TRANSPORT_WS_TLS: Final = "WS_TLS"
 
+# Transport mode options for config flow
+TRANSPORT_OPTIONS: Final = [TRANSPORT_WS_TLS, TRANSPORT_MQTT_TLS, TRANSPORT_WS, TRANSPORT_MQTT]
+
+# Transport to port/protocol mapping
+TRANSPORT_CONFIG: Final = {
+    TRANSPORT_MQTT: {"port": PSK_PORT_MQTT, "transport": "tcp", "tls": False},
+    TRANSPORT_MQTT_TLS: {"port": PSK_PORT_MQTT_TLS, "transport": "tcp", "tls": True},
+    TRANSPORT_WS: {"port": PSK_PORT_WS, "transport": "websockets", "tls": False},
+    TRANSPORT_WS_TLS: {"port": PSK_PORT_WS_TLS, "transport": "websockets", "tls": True},
+}
+
 # Default settings
 DEFAULT_DIRECTION: Final = DIRECTION_RX
-DEFAULT_TRANSPORT: Final = TRANSPORT_MQTT
+DEFAULT_TRANSPORT: Final = TRANSPORT_WS_TLS  # WebSocket+TLS most firewall-friendly
 DEFAULT_MIN_DISTANCE: Final = 0
 DEFAULT_MAX_DISTANCE: Final = 0  # 0 = no limit
 DEFAULT_STATS_WINDOW: Final = 900  # 15 minutes in seconds
@@ -65,6 +77,13 @@ DEFAULT_SAMPLE_RATE: Final = 10  # Process 1 in N messages for global mode
 
 # Sensor update interval
 UPDATE_INTERVAL: Final = 30  # seconds
+
+# Feed health thresholds (v2.2.0)
+# Personal monitors have sparse, intermittent activity (1-10+ min gaps normal)
+# Global monitors have high volume (~1000 msg/min) so shorter threshold works
+FEED_HEALTHY_THRESHOLD_PERSONAL: Final = 300  # 5 minutes for personal callsign monitors
+FEED_HEALTHY_THRESHOLD_GLOBAL: Final = 60  # 1 minute for global (high volume)
+FEED_LOW_ACTIVITY_THRESHOLD: Final = 180  # 3 minutes = low activity warning
 
 # Amateur radio band definitions (MHz)
 BAND_MAPPING: Final = {

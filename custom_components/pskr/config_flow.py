@@ -27,9 +27,11 @@ from .const import (
     CONF_MIN_DISTANCE,
     CONF_MODE_FILTER,
     CONF_SAMPLE_RATE,
+    CONF_TRANSPORT,
     DEFAULT_COUNT_ONLY,
     DEFAULT_DIRECTION,
     DEFAULT_SAMPLE_RATE,
+    DEFAULT_TRANSPORT,
     DIGITAL_MODES,
     DIRECTION_DUAL,
     DIRECTION_RX,
@@ -37,6 +39,10 @@ from .const import (
     DOMAIN,
     MONITOR_GLOBAL,
     MONITOR_PERSONAL,
+    TRANSPORT_MQTT,
+    TRANSPORT_MQTT_TLS,
+    TRANSPORT_WS,
+    TRANSPORT_WS_TLS,
 )
 
 CALLSIGN_REGEX = re.compile(r"^[A-Z0-9]{1,3}[0-9][A-Z0-9]{0,4}[A-Z](?:/[A-Z0-9]+)?$", re.IGNORECASE)
@@ -173,8 +179,25 @@ class PSKReporterOptionsFlow(OptionsFlow):
         options = self.config_entry.options
         is_global = self.config_entry.data.get(CONF_MONITOR_TYPE) == MONITOR_GLOBAL
 
+        # Transport options with descriptions
+        transport_options = [
+            {"value": TRANSPORT_WS_TLS, "label": "WebSocket + TLS (port 1886, recommended)"},
+            {"value": TRANSPORT_MQTT_TLS, "label": "TCP + TLS (port 1884)"},
+            {"value": TRANSPORT_WS, "label": "WebSocket (port 1885)"},
+            {"value": TRANSPORT_MQTT, "label": "TCP plain (port 1883, not recommended)"},
+        ]
+
         # Base schema for all monitor types
         schema_dict: dict[vol.Marker, Any] = {
+            vol.Optional(
+                CONF_TRANSPORT,
+                default=options.get(CONF_TRANSPORT, DEFAULT_TRANSPORT),
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=transport_options,
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            ),
             vol.Optional(
                 CONF_COUNT_ONLY,
                 default=options.get(CONF_COUNT_ONLY, DEFAULT_COUNT_ONLY),

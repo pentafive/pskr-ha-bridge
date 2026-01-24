@@ -24,19 +24,33 @@ logger:
 
 **Symptoms:** `binary_sensor.pskreporter_{callsign}_feed_health` is OFF, sensors show stale data.
 
+**v2.2.0 Update:** Activity-aware thresholds significantly reduce false alarms:
+- **Personal monitors:** 300-second threshold (5 minutes) - appropriate for sparse amateur radio activity
+- **Global monitors:** 60-second threshold - high message volume expected
+
+**Feed Status States (check `sensor.pskreporter_{callsign}_feed_status`):**
+| State | Meaning | Action |
+|-------|---------|--------|
+| Healthy | Data flowing normally | None needed |
+| Low Activity | 180-300s since last message | Normal during low propagation |
+| Stale | No data beyond threshold | Check connection/activity |
+| Disconnected | MQTT connection lost | Check network/firewall |
+
 **Possible Causes:**
 
 | Cause | Solution |
 |-------|----------|
 | No station activity | Normal if you're not transmitting/receiving |
+| Poor propagation | Low Activity status is expected - not an error |
 | Network issue | Check internet connectivity |
-| PSKReporter down | Check [status.pskreporter.info](https://pskreporter.info/) |
-| Firewall blocking | Allow outbound WSS to port 1886 |
+| PSKReporter down | Check [pskreporter.info](https://pskreporter.info/) |
+| Firewall blocking | Allow outbound to port 1886 (or configured port) |
 
 **Diagnostic Steps:**
-1. Check `sensor.pskreporter_{callsign}_message_rate` - should be > 0 msg/min when active
-2. Check `sensor.pskreporter_{callsign}_connection_status` - should show "Connected"
-3. Check `sensor.pskreporter_{callsign}_feed_latency` - time since last message
+1. Check `sensor.pskreporter_{callsign}_feed_status` - shows granular status with reason
+2. Check `sensor.pskreporter_{callsign}_message_rate` - should be > 0 msg/min when active
+3. Check `sensor.pskreporter_{callsign}_connection_status` - should show "Connected"
+4. Check connection_status attributes for `transport_mode` and `transport_port`
 
 **Entity ID Pattern:**
 - Personal: `sensor.pskreporter_{callsign}_{sensor_name}` (e.g., `sensor.pskreporter_w1abc_feed_status`)
@@ -48,17 +62,31 @@ logger:
 
 **Solutions:**
 
-1. **Check network connectivity**
+1. **Try a different transport mode** (v2.2.0+)
+   - Go to Settings > Devices & Services > PSKReporter > Configure
+   - Change "Connection Transport" to a different option
+   - Options: WebSocket+TLS (1886), TCP+TLS (1884), WebSocket (1885), TCP (1883)
+
+2. **Check network connectivity**
    ```bash
-   # Test from HA host
+   # Test WebSocket+TLS (default)
    curl -v https://mqtt.pskreporter.info:1886
+
+   # Test TCP+TLS
+   openssl s_client -connect mqtt.pskreporter.info:1884
    ```
 
-2. **Verify firewall rules** - Allow outbound TCP 1886 (WebSocket TLS)
+3. **Verify firewall rules**
+   | Transport | Port | Protocol |
+   |-----------|------|----------|
+   | WebSocket+TLS | 1886 | TCP outbound |
+   | TCP+TLS | 1884 | TCP outbound |
+   | WebSocket | 1885 | TCP outbound |
+   | TCP plain | 1883 | TCP outbound |
 
-3. **Check for IP blocks** - PSKReporter may rate-limit aggressive connections
+4. **Check for IP blocks** - PSKReporter may rate-limit aggressive connections
 
-4. **Review reconnect count** - If high, check for network instability
+5. **Review reconnect count** - If high, check for network instability
 
 ### Global Monitor Not Receiving Data
 
@@ -174,5 +202,5 @@ DEBUG_MODE=True
 ## PSKReporter Status
 
 - **Website**: [pskreporter.info](https://pskreporter.info/)
-- **MQTT Feed**: [mqtt.pskreporter.info](https://mqtt.pskreporter.info/)
+- **MQTT Feed**: [mqtt.pskreporter.info](http://mqtt.pskreporter.info/)
 - **Status Page**: Check for any announced outages

@@ -59,7 +59,7 @@ class PSKReporterFeedHealthBinarySensor(
                 name="PSKReporter - Global Monitor",
                 manufacturer="PSKReporter.info",
                 model="PSKReporter HA Bridge (Global)",
-                sw_version="2.1.1",
+                sw_version="2.2.0",
                 configuration_url="https://pskreporter.info",
             )
         return DeviceInfo(
@@ -67,7 +67,7 @@ class PSKReporterFeedHealthBinarySensor(
             name=f"PSKReporter - {self.coordinator.callsign}",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge",
-            sw_version="2.1.1",
+            sw_version="2.2.0",
             configuration_url="https://pskreporter.info",
         )
 
@@ -78,28 +78,17 @@ class PSKReporterFeedHealthBinarySensor(
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return extra state attributes."""
+        """Return extra state attributes.
+
+        v2.2.0: Uses activity-aware thresholds from coordinator.
+        """
         health = self.coordinator.data.health
         return {
             "connected": self.coordinator.data.connected,
             "last_message_seconds_ago": round(health.feed_latency, 1),
             "messages_last_minute": health.messages_last_minute,
             "total_messages": health.total_messages,
-            "healthy_threshold_seconds": 60,
-            "reason": self._get_health_reason(),
+            "healthy_threshold_seconds": health.health_threshold_seconds,
+            "feed_status": health.feed_status,  # v2.2.0: healthy, low_activity, stale, disconnected
+            "reason": health.feed_status_reason,  # v2.2.0: uses coordinator's reason
         }
-
-    def _get_health_reason(self) -> str:
-        """Get human-readable reason for health status."""
-        health = self.coordinator.data.health
-
-        if not self.coordinator.data.connected:
-            return "Not connected to MQTT broker"
-
-        if health.last_message_time == 0:
-            return "No messages received yet"
-
-        if health.feed_latency >= 60:
-            return f"No messages for {int(health.feed_latency)} seconds (PSKReporter feed may be down)"
-
-        return "Feed is healthy - data flowing normally"
