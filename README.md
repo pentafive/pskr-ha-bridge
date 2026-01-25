@@ -290,6 +290,7 @@ pskr/filter/v2/+/FT4/+/+/#
 - [Dashboard Examples](https://github.com/pentafive/pskr-ha-bridge/wiki/Dashboard-Examples) - Lovelace configurations
 - [Troubleshooting](https://github.com/pentafive/pskr-ha-bridge/wiki/Troubleshooting) - Common issues
 - [PSKReporter Data](https://github.com/pentafive/pskr-ha-bridge/wiki/PSKReporter-Data) - Understanding the feed
+- [Roadmap](docs/ROADMAP.md) - Planned features
 
 ## Contributing
 
