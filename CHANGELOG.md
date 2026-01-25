@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.1] - 2026-01-24
+
+### Added
+- **Dashboard Generator** - Web-based tool to generate customized dashboards for your callsign
+  - Visit [Dashboard Generator](https://pentafive.github.io/pskr-ha-bridge/dashboard-generator.html)
+  - Enter callsign, optionally add second callsign for comparison view
+  - Generates complete Lovelace YAML with all v2.3.0 sensors
+- **CLI Dashboard Generator** - Command-line alternative (`examples/dashboards/generate_dashboard.py`)
+- **Template System** - Dashboard templates for maintainable generation
+  - Templates in `examples/dashboards/templates/`
+  - Both web and CLI generators use same templates
+  - Template updates automatically propagate to users
+
+### Changed
+- **Example Dashboards** - Removed hardcoded callsigns, now use placeholders
+- **Documentation** - Updated README and wiki with generator links
+
+---
+
 ## [2.3.0] - 2026-01-24
 
 ### Added
