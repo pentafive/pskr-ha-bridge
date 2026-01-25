@@ -286,6 +286,7 @@ pskr/filter/v2/+/FT4/+/+/#
 
 ## Documentation
 
+- **[Dashboard Generator](https://pentafive.github.io/pskr-ha-bridge/dashboard-generator.html)** - Generate a customized dashboard for your callsign
 - [Dashboard Examples](https://github.com/pentafive/pskr-ha-bridge/wiki/Dashboard-Examples) - Lovelace configurations
 - [Troubleshooting](https://github.com/pentafive/pskr-ha-bridge/wiki/Troubleshooting) - Common issues
 - [PSKReporter Data](https://github.com/pentafive/pskr-ha-bridge/wiki/PSKReporter-Data) - Understanding the feed

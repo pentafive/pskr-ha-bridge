@@ -8,7 +8,7 @@
 #
 # Installation:
 # 1. Replace {callsign_a} and {callsign_b} with your callsigns in lowercase
-#    Example: kd5qlm vs kj5iuy
+#    Example: {callsign} vs {callsign2}
 # 2. Replace {CALLSIGN_A} and {CALLSIGN_B} with display names (uppercase)
 # 3. Copy this YAML into a new dashboard or view
 #

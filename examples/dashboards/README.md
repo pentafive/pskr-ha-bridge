@@ -1,53 +1,101 @@
 # Dashboard Examples
 
-This directory provides guidance for creating Home Assistant dashboards for the PSKReporter integration.
+This directory provides tools and templates for creating Home Assistant dashboards for the PSKReporter integration.
 
-## Getting Dashboard YAML
+## Dashboard Generator (Recommended)
 
-Complete dashboard examples with copy-paste YAML are available in the **[Dashboard Examples Wiki](../../docs/wiki/Dashboard-Examples.md)**.
+The easiest way to create a dashboard is to use the generator:
 
-The wiki includes:
-- Personal monitor cards (basic, glance, mushroom, graphs)
-- Global monitor cards (band activity, charts)
-- Antenna comparison dashboards
-- Health monitoring cards
-- Automation examples
-- v2.3.0 per-band sensor cards
+### Web Generator (No Install Required)
+
+Visit: **[Dashboard Generator](https://pentafive.github.io/pskr-ha-bridge/dashboard-generator.html)**
+
+Just enter your callsign and copy the generated YAML.
+
+### Command Line
+
+```bash
+# Single callsign
+python3 generate_dashboard.py W1ABC
+
+# Two callsigns (comparison view)
+python3 generate_dashboard.py W1ABC K2DEF
+
+# Save to file
+python3 generate_dashboard.py W1ABC -o my-dashboard.yaml
+
+# Options
+python3 generate_dashboard.py W1ABC --no-global   # Without global monitor
+python3 generate_dashboard.py W1ABC --no-bands    # Without per-band breakdown
+```
+
+### One-liner (curl)
+
+```bash
+curl -sL https://raw.githubusercontent.com/pentafive/pskr-ha-bridge/main/examples/dashboards/generate_dashboard.py | python3 - W1ABC
+```
+
+## Installing the Generated Dashboard
+
+1. Copy the generated YAML
+2. In Home Assistant: **Settings → Dashboards → Add Dashboard**
+3. Create a new dashboard
+4. Click ⋮ → **Edit Dashboard** → ⋮ → **Raw configuration editor**
+5. Paste the YAML and save
+
+## Directory Contents
+
+```
+dashboards/
+├── generate_dashboard.py    # CLI dashboard generator
+├── templates/               # YAML templates (used by generator)
+│   ├── header.yaml
+│   ├── callsign-section.yaml
+│   ├── band-breakdown.yaml
+│   ├── global-section.yaml
+│   └── comparison-section.yaml
+├── personal-monitor.yaml    # Basic HACS integration example
+├── docker-personal-monitor.yaml  # Docker bridge example
+├── global-monitor.yaml      # Global monitor example
+└── antenna-comparison.yaml  # Multi-antenna comparison
+```
 
 ## Entity Naming Patterns
 
 | Mode | Entity Pattern | Example |
 |------|----------------|---------|
-| HACS Integration | `sensor.pskreporter_{call}_*` | `sensor.pskreporter_kd5qlm_total_spots` |
-| Docker Bridge | `sensor.pskr_stats_rx_{call}_*` | `sensor.pskr_stats_rx_kd5qlm_total_spots` |
+| HACS Integration | `sensor.pskreporter_{call}_*` | `sensor.pskreporter_w1abc_total_spots` |
+| Docker Bridge | `sensor.pskr_stats_rx_{call}_*` | `sensor.pskr_stats_rx_w1abc_total_spots` |
 | Global Monitor | `sensor.pskreporter_global_monitor_*` | `sensor.pskreporter_global_monitor_20m_activity` |
 
 Replace `{call}` with your callsign in lowercase.
 
 ## Required HACS Frontend Cards
 
-Install from HACS -> Frontend:
+Install from HACS → Frontend:
 
-- **[Mushroom](https://github.com/piitaya/lovelace-mushroom)** - Modern entity cards and chips
-- **[Mini Graph Card](https://github.com/kalkih/mini-graph-card)** - Simple trend charts
-- **[ApexCharts Card](https://github.com/RomRider/apexcharts-card)** - Advanced charts and comparisons
+- **[Mushroom](https://github.com/piitaya/lovelace-mushroom)** - Modern entity cards
+- **[Mini Graph Card](https://github.com/kalkih/mini-graph-card)** - Trend charts
+- **[ApexCharts Card](https://github.com/RomRider/apexcharts-card)** - Comparison charts
 
-**Note:** Basic entity cards work without any custom cards.
+Basic entity cards work without any custom cards.
 
-## Quick Start Example
+## Template Placeholders
 
-Minimal personal monitor card (no custom cards required):
+The templates use these placeholders:
 
-```yaml
-type: entities
-title: PSKReporter - W1ABC
-entities:
-  - entity: sensor.pskreporter_w1abc_total_spots
-  - entity: sensor.pskreporter_w1abc_unique_stations
-  - entity: sensor.pskreporter_w1abc_most_active_band
-  - entity: sensor.pskreporter_w1abc_maximum_distance
-  - entity: sensor.pskreporter_w1abc_average_snr
-  - entity: binary_sensor.pskreporter_w1abc_feed_health
-```
+| Placeholder | Description | Example |
+|-------------|-------------|---------|
+| `${CALLSIGN}` | Uppercase callsign | W1ABC |
+| `${CALL_LOWER}` | Lowercase callsign | w1abc |
+| `${COLOR}` | Theme color for callsign | #1E88E5 |
 
-Replace `w1abc` with your callsign in lowercase.
+## Modifying Templates
+
+To customize the dashboard layout:
+
+1. Edit files in `templates/`
+2. Run the generator to test changes
+3. Both CLI and web generators will pick up template changes
+
+The web generator fetches templates from GitHub, so changes are reflected after push.

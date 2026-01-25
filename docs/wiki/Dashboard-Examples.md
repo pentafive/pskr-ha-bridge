@@ -2,6 +2,21 @@
 
 This page provides Home Assistant dashboard examples for the PSKReporter integration.
 
+## Dashboard Generator (Recommended)
+
+The easiest way to create a dashboard is with the generator:
+
+**[📡 Dashboard Generator](https://pentafive.github.io/pskr-ha-bridge/dashboard-generator.html)** - Enter your callsign and get a complete dashboard YAML
+
+Or use the command line:
+```bash
+python3 examples/dashboards/generate_dashboard.py W1ABC
+```
+
+See [`examples/dashboards/README.md`](../../examples/dashboards/README.md) for full generator documentation.
+
+---
+
 **Quick Links:**
 - [Personal Monitor Cards](#personal-monitor-cards)
 - [Global Monitor Cards](#global-monitor-cards)
@@ -348,18 +363,19 @@ Compare two stations/antennas side-by-side. See [`examples/dashboards/antenna-co
 ### Dual-Line Comparison Chart
 
 ```yaml
+# Replace {callsign_a} and {callsign_b} with your callsigns (lowercase)
 type: custom:apexcharts-card
 header:
   title: Spot Count Comparison (24h)
   show: true
 graph_span: 24h
 series:
-  - entity: sensor.pskreporter_kd5qlm_total_spots
-    name: "KD5QLM"
+  - entity: sensor.pskreporter_{callsign_a}_total_spots
+    name: "{CALLSIGN_A}"
     color: "#1E88E5"
     stroke_width: 2
-  - entity: sensor.pskreporter_kj5iuy_total_spots
-    name: "KJ5IUY"
+  - entity: sensor.pskreporter_{callsign_b}_total_spots
+    name: "{CALLSIGN_B}"
     color: "#FFA726"
     stroke_width: 2
 ```
@@ -376,12 +392,12 @@ yaxis:
   - min: -20
     max: 0
 series:
-  - entity: sensor.pskreporter_kd5qlm_average_snr
-    name: "KD5QLM"
+  - entity: sensor.pskreporter_{callsign_a}_average_snr
+    name: "{CALLSIGN_A}"
     color: "#1E88E5"
     stroke_width: 2
-  - entity: sensor.pskreporter_kj5iuy_average_snr
-    name: "KJ5IUY"
+  - entity: sensor.pskreporter_{callsign_b}_average_snr
+    name: "{CALLSIGN_B}"
     color: "#FFA726"
     stroke_width: 2
 ```
@@ -392,22 +408,22 @@ series:
 type: horizontal-stack
 cards:
   - type: entities
-    title: "KD5QLM"
+    title: "{CALLSIGN_A}"
     entities:
-      - entity: sensor.pskreporter_kd5qlm_total_spots
+      - entity: sensor.pskreporter_{callsign_a}_total_spots
         name: Total Spots
-      - entity: sensor.pskreporter_kd5qlm_average_snr
+      - entity: sensor.pskreporter_{callsign_a}_average_snr
         name: Avg SNR
-      - entity: sensor.pskreporter_kd5qlm_maximum_distance
+      - entity: sensor.pskreporter_{callsign_a}_maximum_distance
         name: Max Distance
   - type: entities
-    title: "KJ5IUY"
+    title: "{CALLSIGN_B}"
     entities:
-      - entity: sensor.pskreporter_kj5iuy_total_spots
+      - entity: sensor.pskreporter_{callsign_b}_total_spots
         name: Total Spots
-      - entity: sensor.pskreporter_kj5iuy_average_snr
+      - entity: sensor.pskreporter_{callsign_b}_average_snr
         name: Avg SNR
-      - entity: sensor.pskreporter_kj5iuy_maximum_distance
+      - entity: sensor.pskreporter_{callsign_b}_maximum_distance
         name: Max Distance
 ```
 

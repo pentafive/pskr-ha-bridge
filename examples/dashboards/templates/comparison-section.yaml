@@ -1,0 +1,26 @@
+  - cards:
+      - type: custom:apexcharts-card
+        header:
+          title: Spot Count Comparison (24h)
+          show: true
+        graph_span: 24h
+        series:
+${SERIES_SPOTS}
+      - type: custom:apexcharts-card
+        header:
+          title: SNR Comparison (24h)
+          show: true
+        graph_span: 24h
+        yaxis:
+          - min: -20
+            max: 0
+        series:
+${SERIES_SNR}
+      - type: custom:apexcharts-card
+        header:
+          title: Propagation Score (24h)
+          show: true
+        graph_span: 24h
+        series:
+${SERIES_PROPAGATION}
+    column_span: 3

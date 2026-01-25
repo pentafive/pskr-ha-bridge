@@ -1,0 +1,64 @@
+  - cards:
+      - type: heading
+        heading: ${CALLSIGN} Band Breakdown
+        heading_style: subtitle
+      - type: custom:mini-graph-card
+        name: Band Spots (24h)
+        entities:
+          - entity: sensor.pskreporter_${CALL_LOWER}_20m_spots
+            name: 20m
+            color: "#1E88E5"
+          - entity: sensor.pskreporter_${CALL_LOWER}_40m_spots
+            name: 40m
+            color: "#43A047"
+          - entity: sensor.pskreporter_${CALL_LOWER}_15m_spots
+            name: 15m
+            color: "#FFA726"
+          - entity: sensor.pskreporter_${CALL_LOWER}_10m_spots
+            name: 10m
+            color: "#E53935"
+          - entity: sensor.pskreporter_${CALL_LOWER}_17m_spots
+            name: 17m
+            color: "#8E24AA"
+        hours_to_show: 24
+        points_per_hour: 4
+        line_width: 2
+        show:
+          labels: true
+          legend: true
+          state: true
+      - type: glance
+        title: Band SNR (dB)
+        show_name: true
+        show_icon: false
+        show_state: true
+        columns: 5
+        entities:
+          - entity: sensor.pskreporter_${CALL_LOWER}_20m_avg_snr
+            name: 20m
+          - entity: sensor.pskreporter_${CALL_LOWER}_40m_avg_snr
+            name: 40m
+          - entity: sensor.pskreporter_${CALL_LOWER}_15m_avg_snr
+            name: 15m
+          - entity: sensor.pskreporter_${CALL_LOWER}_10m_avg_snr
+            name: 10m
+          - entity: sensor.pskreporter_${CALL_LOWER}_17m_avg_snr
+            name: 17m
+      - type: glance
+        title: Band Max Distance
+        show_name: true
+        show_icon: false
+        show_state: true
+        columns: 5
+        entities:
+          - entity: sensor.pskreporter_${CALL_LOWER}_20m_max_distance
+            name: 20m
+          - entity: sensor.pskreporter_${CALL_LOWER}_40m_max_distance
+            name: 40m
+          - entity: sensor.pskreporter_${CALL_LOWER}_15m_max_distance
+            name: 15m
+          - entity: sensor.pskreporter_${CALL_LOWER}_10m_max_distance
+            name: 10m
+          - entity: sensor.pskreporter_${CALL_LOWER}_17m_max_distance
+            name: 17m
+    column_span: 1

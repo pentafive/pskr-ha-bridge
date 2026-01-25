@@ -1,0 +1,121 @@
+  - cards:
+      - type: heading
+        heading: Global Propagation
+        heading_style: title
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-template-card
+            primary: Top Band
+            secondary: "{{ states('sensor.pskreporter_global_monitor_most_active_band_global') }}"
+            icon: mdi:earth
+            layout: horizontal
+            fill_container: true
+            entity: sensor.pskreporter_global_monitor_most_active_band_global
+            icon_color: "#9c27b0"
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-template-card
+            primary: Top Mode
+            secondary: "{{ states('sensor.pskreporter_global_monitor_most_active_mode_global') }}"
+            icon: mdi:waveform
+            layout: horizontal
+            fill_container: true
+            entity: sensor.pskreporter_global_monitor_most_active_mode_global
+            icon_color: "#9c27b0"
+            tap_action:
+              action: more-info
+      - type: vertical-stack
+        cards:
+          - type: horizontal-stack
+            cards:
+              - type: custom:mushroom-template-card
+                primary: Global Spots
+                secondary: "{{ states('sensor.pskreporter_global_monitor_global_spots') }}"
+                icon: mdi:earth
+                layout: horizontal
+                entity: sensor.pskreporter_global_monitor_global_spots
+                icon_color: "#9c27b0"
+                tap_action:
+                  action: more-info
+              - type: custom:mini-graph-card
+                entities:
+                  - sensor.pskreporter_global_monitor_global_spots
+                hours_to_show: 24
+                points_per_hour: 4
+                line_color: "#9c27b0"
+                show:
+                  name: false
+                  icon: false
+                  state: false
+                  legend: false
+                  labels: false
+                height: 80
+          - type: horizontal-stack
+            cards:
+              - type: custom:mushroom-template-card
+                primary: Active Stations
+                secondary: "{{ states('sensor.pskreporter_global_monitor_global_unique_stations') }}"
+                icon: mdi:account-group
+                layout: horizontal
+                entity: sensor.pskreporter_global_monitor_global_unique_stations
+                icon_color: "#673ab7"
+                tap_action:
+                  action: more-info
+              - type: custom:mini-graph-card
+                entities:
+                  - sensor.pskreporter_global_monitor_global_unique_stations
+                hours_to_show: 24
+                points_per_hour: 4
+                line_color: "#673ab7"
+                show:
+                  name: false
+                  icon: false
+                  state: false
+                  legend: false
+                  labels: false
+                height: 80
+      - type: horizontal-stack
+        cards:
+          - type: custom:mushroom-template-card
+            primary: Connection
+            secondary: "{{ states('sensor.pskreporter_global_monitor_connection_status') }}"
+            icon: mdi:connection
+            layout: horizontal
+            icon_color: >-
+              {{ '#4caf50' if is_state('sensor.pskreporter_global_monitor_connection_status', 'Connected') else '#f44336' }}
+            entity: sensor.pskreporter_global_monitor_connection_status
+            tap_action:
+              action: more-info
+          - type: custom:mushroom-template-card
+            primary: Feed
+            secondary: "{{ states('sensor.pskreporter_global_monitor_feed_status') }}"
+            icon: mdi:heart-pulse
+            layout: horizontal
+            icon_color: >-
+              {{ '#4caf50' if 'Healthy' in states('sensor.pskreporter_global_monitor_feed_status') else '#ff9800' }}
+            entity: sensor.pskreporter_global_monitor_feed_status
+            tap_action:
+              action: more-info
+      - type: custom:mini-graph-card
+        name: HF Band Activity
+        entities:
+          - entity: sensor.pskreporter_global_monitor_20m_activity
+            name: 20m
+            color: "#1E88E5"
+          - entity: sensor.pskreporter_global_monitor_40m_activity
+            name: 40m
+            color: "#43A047"
+          - entity: sensor.pskreporter_global_monitor_15m_activity
+            name: 15m
+            color: "#FFA726"
+          - entity: sensor.pskreporter_global_monitor_10m_activity
+            name: 10m
+            color: "#E53935"
+        hours_to_show: 24
+        points_per_hour: 4
+        line_width: 2
+        show:
+          labels: true
+          legend: true
+          state: true
+    column_span: 1

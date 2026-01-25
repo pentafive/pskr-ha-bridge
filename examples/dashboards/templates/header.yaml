@@ -1,0 +1,8 @@
+# PSKReporter Dashboard - Generated for ${CALLSIGNS}
+# Requires: PSKReporter HACS v2.3.0+, mushroom, mini-graph-card, apexcharts-card
+title: PSKr Insights
+path: pskr-insights
+icon: mdi:radio-tower
+type: sections
+max_columns: ${MAX_COLUMNS}
+sections:

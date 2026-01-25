@@ -6,11 +6,11 @@
 # Requirements:
 # - pskr-ha-bridge running in Docker mode (NOT HACS integration)
 # - HACS custom cards: mushroom, mini-graph-card
-# - Replace KD5QLM with your callsign
+# - Replace {CALLSIGN} with your callsign
 #
 # Entity pattern: sensor.pskr_stats_rx_{callsign}_{metric}
 
-title: PSKr Insights (KD5QLM)
+title: PSKr Insights ({CALLSIGN})
 path: pskr-insights
 icon: m3of:analytics
 type: sections
@@ -23,11 +23,11 @@ sections:
         cards:
           - type: custom:mushroom-template-card
             primary: Top Band
-            secondary: "{{ states('sensor.pskr_stats_rx_kd5qlm_most_active_band') }}"
+            secondary: "{{ states('sensor.pskr_stats_rx_{callsign}_most_active_band') }}"
             icon: mdi:chart-bar
             layout: horizontal
             fill_container: true
-            entity: sensor.pskr_stats_rx_kd5qlm_most_active_band
+            entity: sensor.pskr_stats_rx_{callsign}_most_active_band
             tap_action:
               action: more-info
             hold_action:
@@ -36,11 +36,11 @@ sections:
               action: none
           - type: custom:mushroom-template-card
             primary: Top Mode
-            secondary: "{{ states('sensor.pskr_stats_rx_kd5qlm_most_active_mode') }}"
+            secondary: "{{ states('sensor.pskr_stats_rx_{callsign}_most_active_mode') }}"
             icon: mdi:waveform
             layout: horizontal
             fill_container: true
-            entity: sensor.pskr_stats_rx_kd5qlm_most_active_mode
+            entity: sensor.pskr_stats_rx_{callsign}_most_active_mode
             tap_action:
               action: more-info
             hold_action:
@@ -53,13 +53,13 @@ sections:
             cards:
               - type: custom:mushroom-template-card
                 primary: Total Spots
-                secondary: "{{ states('sensor.pskr_stats_rx_kd5qlm_total_spots') }}"
+                secondary: "{{ states('sensor.pskr_stats_rx_{callsign}_total_spots') }}"
                 icon: mdi:radar
                 layout: horizontal
                 tap_action:
                   action: more-info
                 multiline_secondary: false
-                entity: sensor.pskr_stats_rx_kd5qlm_total_spots
+                entity: sensor.pskr_stats_rx_{callsign}_total_spots
                 icon_color: "#2196f3"
                 badge_color: "#2196f3"
                 hold_action:
@@ -68,7 +68,7 @@ sections:
                   action: none
               - type: custom:mini-graph-card
                 entities:
-                  - sensor.pskr_stats_rx_kd5qlm_total_spots
+                  - sensor.pskr_stats_rx_{callsign}_total_spots
                 hours_to_show: 120
                 points_per_hour: 4
                 line_color: "#2196f3"
@@ -88,11 +88,11 @@ sections:
               - type: custom:mushroom-template-card
                 primary: Unique Senders
                 secondary: >-
-                  {{ states('sensor.pskr_stats_rx_kd5qlm_total_unique_senders')
+                  {{ states('sensor.pskr_stats_rx_{callsign}_total_unique_senders')
                   }}
                 icon: mdi:account-multiple
                 layout: horizontal
-                entity: sensor.pskr_stats_rx_kd5qlm_total_unique_senders
+                entity: sensor.pskr_stats_rx_{callsign}_total_unique_senders
                 icon_color: "#ff9800"
                 badge_color: "#ff9800"
                 tap_action:
@@ -104,7 +104,7 @@ sections:
                 fill_container: false
               - type: custom:mini-graph-card
                 entities:
-                  - sensor.pskr_stats_rx_kd5qlm_total_unique_senders
+                  - sensor.pskr_stats_rx_{callsign}_total_unique_senders
                 hours_to_show: 120
                 points_per_hour: 4
                 line_color: "#ff9800"
@@ -125,11 +125,11 @@ sections:
                 primary: Unique Countries
                 secondary: >-
                   {{
-                  states('sensor.pskr_stats_rx_kd5qlm_total_unique_countries')
+                  states('sensor.pskr_stats_rx_{callsign}_total_unique_countries')
                   }}
                 icon: m3of:public
                 layout: horizontal
-                entity: sensor.pskr_stats_rx_kd5qlm_total_unique_countries
+                entity: sensor.pskr_stats_rx_{callsign}_total_unique_countries
                 tap_action:
                   action: more-info
                 fill_container: false
@@ -142,7 +142,7 @@ sections:
                 badge_color: "#4caf50"
               - type: custom:mini-graph-card
                 entities:
-                  - sensor.pskr_stats_rx_kd5qlm_total_unique_countries
+                  - sensor.pskr_stats_rx_{callsign}_total_unique_countries
                 hours_to_show: 120
                 points_per_hour: 4
                 line_color: "#4caf50"
@@ -163,7 +163,7 @@ sections:
             cards:
               - type: custom:mushroom-template-card
                 primary: Active Bands (Overall)
-                secondary: "{{ states('sensor.pskr_stats_rx_kd5qlm_active_bands') }}"
+                secondary: "{{ states('sensor.pskr_stats_rx_{callsign}_active_bands') }}"
                 icon: mdi:chart-bell-curve-cumulative
                 layout: horizontal
                 icon_color: "#00bcd4"
@@ -174,10 +174,10 @@ sections:
                   action: none
                 tap_action:
                   action: more-info
-                entity: sensor.pskr_stats_rx_kd5qlm_active_bands
+                entity: sensor.pskr_stats_rx_{callsign}_active_bands
               - type: custom:mini-graph-card
                 entities:
-                  - sensor.pskr_stats_rx_kd5qlm_active_bands
+                  - sensor.pskr_stats_rx_{callsign}_active_bands
                 hours_to_show: 120
                 points_per_hour: 4
                 line_color: "#00bcd4"
@@ -198,12 +198,12 @@ sections:
             cards:
               - type: custom:mushroom-template-card
                 primary: Min SNR
-                secondary: "{{ states('sensor.pskr_stats_rx_kd5qlm_total_min_snr') }} dB"
+                secondary: "{{ states('sensor.pskr_stats_rx_{callsign}_total_min_snr') }} dB"
                 icon: mdi:signal-cellular-1
                 layout: horizontal
                 icon_color: "#f44336"
                 badge_color: "#f44336"
-                entity: sensor.pskr_stats_rx_kd5qlm_total_min_snr
+                entity: sensor.pskr_stats_rx_{callsign}_total_min_snr
                 tap_action:
                   action: more-info
                 hold_action:
@@ -212,7 +212,7 @@ sections:
                   action: none
               - type: custom:mini-graph-card
                 entities:
-                  - entity: sensor.pskr_stats_rx_kd5qlm_total_min_snr
+                  - entity: sensor.pskr_stats_rx_{callsign}_total_min_snr
                     color: "#f44336"
                 hours_to_show: 120
                 points_per_hour: 4
@@ -231,12 +231,12 @@ sections:
             cards:
               - type: custom:mushroom-template-card
                 primary: Avg SNR
-                secondary: "{{ states('sensor.pskr_stats_rx_kd5qlm_total_avg_snr') }} dB"
+                secondary: "{{ states('sensor.pskr_stats_rx_{callsign}_total_avg_snr') }} dB"
                 icon: mdi:signal
                 layout: horizontal
                 icon_color: "#ffc107"
                 badge_color: "#ffc107"
-                entity: sensor.pskr_stats_rx_kd5qlm_total_avg_snr
+                entity: sensor.pskr_stats_rx_{callsign}_total_avg_snr
                 tap_action:
                   action: more-info
                 hold_action:
@@ -245,7 +245,7 @@ sections:
                   action: none
               - type: custom:mini-graph-card
                 entities:
-                  - entity: sensor.pskr_stats_rx_kd5qlm_total_avg_snr
+                  - entity: sensor.pskr_stats_rx_{callsign}_total_avg_snr
                     color: "#ffc107"
                 hours_to_show: 120
                 points_per_hour: 4
@@ -264,12 +264,12 @@ sections:
             cards:
               - type: custom:mushroom-template-card
                 primary: Max SNR
-                secondary: "{{ states('sensor.pskr_stats_rx_kd5qlm_total_max_snr') }} dB"
+                secondary: "{{ states('sensor.pskr_stats_rx_{callsign}_total_max_snr') }} dB"
                 icon: mdi:signal-cellular-3
                 layout: horizontal
                 icon_color: "#8bc34a"
                 badge_color: "#8bc34a"
-                entity: sensor.pskr_stats_rx_kd5qlm_total_max_snr
+                entity: sensor.pskr_stats_rx_{callsign}_total_max_snr
                 tap_action:
                   action: more-info
                 hold_action:
@@ -278,7 +278,7 @@ sections:
                   action: none
               - type: custom:mini-graph-card
                 entities:
-                  - entity: sensor.pskr_stats_rx_kd5qlm_total_max_snr
+                  - entity: sensor.pskr_stats_rx_{callsign}_total_max_snr
                     color: "#8bc34a"
                 hours_to_show: 120
                 points_per_hour: 4
@@ -299,12 +299,12 @@ sections:
             cards:
               - type: custom:mushroom-template-card
                 primary: Min Dist
-                secondary: "{{ states('sensor.pskr_stats_rx_kd5qlm_total_min_dist') }} km"
+                secondary: "{{ states('sensor.pskr_stats_rx_{callsign}_total_min_dist') }} km"
                 icon: m3of:compress
                 layout: horizontal
                 icon_color: "#9c27b0"
                 badge_color: "#9c27b0"
-                entity: sensor.pskr_stats_rx_kd5qlm_total_min_dist
+                entity: sensor.pskr_stats_rx_{callsign}_total_min_dist
                 tap_action:
                   action: more-info
                 hold_action:
@@ -313,7 +313,7 @@ sections:
                   action: none
               - type: custom:mini-graph-card
                 entities:
-                  - entity: sensor.pskr_stats_rx_kd5qlm_total_min_dist
+                  - entity: sensor.pskr_stats_rx_{callsign}_total_min_dist
                     color: "#9c27b0"
                 hours_to_show: 120
                 points_per_hour: 4
@@ -332,12 +332,12 @@ sections:
             cards:
               - type: custom:mushroom-template-card
                 primary: Avg Dist
-                secondary: "{{ states('sensor.pskr_stats_rx_kd5qlm_total_avg_dist') }} km"
+                secondary: "{{ states('sensor.pskr_stats_rx_{callsign}_total_avg_dist') }} km"
                 icon: m3of:distance
                 layout: horizontal
                 icon_color: "#03a9f4"
                 badge_color: "#03a9f4"
-                entity: sensor.pskr_stats_rx_kd5qlm_total_avg_dist
+                entity: sensor.pskr_stats_rx_{callsign}_total_avg_dist
                 tap_action:
                   action: more-info
                 hold_action:
@@ -346,7 +346,7 @@ sections:
                   action: none
               - type: custom:mini-graph-card
                 entities:
-                  - entity: sensor.pskr_stats_rx_kd5qlm_total_avg_dist
+                  - entity: sensor.pskr_stats_rx_{callsign}_total_avg_dist
                     color: "#03a9f4"
                 hours_to_show: 120
                 points_per_hour: 4
@@ -365,7 +365,7 @@ sections:
             cards:
               - type: custom:mushroom-template-card
                 primary: Max Dist
-                secondary: "{{ states('sensor.pskr_stats_rx_kd5qlm_total_max_dist') }} km"
+                secondary: "{{ states('sensor.pskr_stats_rx_{callsign}_total_max_dist') }} km"
                 icon: m3of:expand
                 layout: horizontal
                 icon_color: "#e91e63"
@@ -376,10 +376,10 @@ sections:
                   action: none
                 double_tap_action:
                   action: none
-                entity: sensor.pskr_stats_rx_kd5qlm_total_max_dist
+                entity: sensor.pskr_stats_rx_{callsign}_total_max_dist
               - type: custom:mini-graph-card
                 entities:
-                  - entity: sensor.pskr_stats_rx_kd5qlm_total_max_dist
+                  - entity: sensor.pskr_stats_rx_{callsign}_total_max_dist
                     color: "#e91e63"
                 hours_to_show: 120
                 points_per_hour: 4
@@ -396,21 +396,21 @@ sections:
                   }
     column_span: 1
 badges:
-  - entity: sensor.pskr_stats_rx_kd5qlm_total_spots
+  - entity: sensor.pskr_stats_rx_{callsign}_total_spots
     name: Spots(15m)
   - type: entity
     show_name: false
     show_state: true
     show_icon: true
-    entity: sensor.pskr_stats_rx_kd5qlm_total_unique_senders
+    entity: sensor.pskr_stats_rx_{callsign}_total_unique_senders
     name: Senders
   - type: entity
     show_name: false
     show_state: true
     show_icon: true
-    entity: sensor.pskr_stats_rx_kd5qlm_total_unique_countries
+    entity: sensor.pskr_stats_rx_{callsign}_total_unique_countries
     name: Countries
     show_entity_picture: false
-  - entity: sensor.pskr_stats_rx_kd5qlm_most_active_band
-  - entity: sensor.pskr_stats_rx_kd5qlm_most_active_mode
+  - entity: sensor.pskr_stats_rx_{callsign}_most_active_band
+  - entity: sensor.pskr_stats_rx_{callsign}_most_active_mode
 cards: []
