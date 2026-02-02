@@ -27,6 +27,7 @@ from .const import (
     CONF_COUNTRY_BLOCK,
     CONF_COUNTRY_FILTER,
     CONF_DIRECTION,
+    CONF_DXCC_WANTED,
     CONF_MAX_DISTANCE,
     CONF_MIN_DISTANCE,
     CONF_MODE_FILTER,
@@ -42,6 +43,7 @@ from .const import (
     DIRECTION_TX,
     DOMAIN,
     DX_THRESHOLD_KM,
+    EVENT_WANTED_SPOT,
     FEED_HEALTHY_THRESHOLD_GLOBAL,
     FEED_HEALTHY_THRESHOLD_PERSONAL,
     FEED_LOW_ACTIVITY_THRESHOLD,
@@ -53,6 +55,7 @@ from .const import (
     TRANSPORT_CONFIG,
     UPDATE_INTERVAL,
 )
+from .wanted_list import parse_wanted_list
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -177,6 +180,11 @@ class PSKReporterData:
     dx_ratio: float = 0.0  # % spots > DX_THRESHOLD_KM
     propagation_score: int = 0  # composite metric
 
+    # Wanted list tracking (v2.4.0)
+    wanted_match: bool = False
+    wanted_match_count: int = 0
+    wanted_list_size: int = 0
+
 
 class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
     """Coordinator for PSKReporter data."""
@@ -204,6 +212,16 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         self._callsign_block = {c.upper() for c in entry.options.get(CONF_CALLSIGN_BLOCK, [])}
         self._country_allow = set(entry.options.get(CONF_COUNTRY_ALLOW, []))
         self._country_block = set(entry.options.get(CONF_COUNTRY_BLOCK, []))
+
+        # Band filter set for O(1) lookup (v2.4.0)
+        self._band_filter_set: set[str] = set(self._band_filter)
+
+        # DXCC/Band wanted list (v2.4.0)
+        wanted_raw = entry.options.get(CONF_DXCC_WANTED, "")
+        self._wanted_set: set[tuple[str, str]] = parse_wanted_list(
+            wanted_raw if isinstance(wanted_raw, str) else ""
+        )
+        self._wanted_match_times: list[float] = []
 
         # Monitor type and options
         self._monitor_type = entry.data.get("monitor_type", MONITOR_PERSONAL)
@@ -420,6 +438,9 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                 self._health.incomplete_spots += 1
             elif self._should_include_spot(spot):
                 self._spots.append(spot)
+                # Check wanted list (v2.4.0)
+                if self._wanted_set:
+                    self._check_wanted_match(spot)
                 asyncio.run_coroutine_threadsafe(
                     self.async_request_refresh(), self.hass.loop
                 )
@@ -517,6 +538,9 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         # Mode filtering
         if self._mode_filter and spot.mode not in self._mode_filter:
             return False
+        # Band filtering (v2.4.0)
+        if self._band_filter_set and spot.band.lower() not in self._band_filter_set:
+            return False
         # Callsign block list (exclude if either station is blocked)
         if self._callsign_block:
             sender_upper = spot.sender_callsign.upper()
@@ -538,6 +562,38 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         if self._country_allow:
             return spot.sender_dxcc in self._country_allow or spot.receiver_dxcc in self._country_allow
         return True
+
+    def _check_wanted_match(self, spot: SpotData) -> None:
+        """Check if spot matches any DXCC/band wanted combination (v2.4.0)."""
+        matched_dxcc: str | None = None
+
+        # Direction-aware matching
+        band_lower = spot.band.lower()
+        if self._direction in (DIRECTION_RX, DIRECTION_DUAL) and (spot.sender_dxcc, band_lower) in self._wanted_set:
+            matched_dxcc = spot.sender_dxcc
+        if matched_dxcc is None and self._direction in (DIRECTION_TX, DIRECTION_DUAL) and (spot.receiver_dxcc, band_lower) in self._wanted_set:
+            matched_dxcc = spot.receiver_dxcc
+
+        if matched_dxcc is not None:
+            self._wanted_match_times.append(time.time())
+
+            # Fire HA event
+            event_data = {
+                "sender_callsign": spot.sender_callsign,
+                "receiver_callsign": spot.receiver_callsign,
+                "frequency": spot.frequency,
+                "band": spot.band,
+                "mode": spot.mode,
+                "snr": spot.snr,
+                "distance_km": spot.distance_km,
+                "sender_dxcc": spot.sender_dxcc,
+                "receiver_dxcc": spot.receiver_dxcc,
+                "matched_dxcc": matched_dxcc,
+                "matched_band": spot.band,
+            }
+            self.hass.loop.call_soon_threadsafe(
+                self.hass.bus.async_fire, EVENT_WANTED_SPOT, event_data
+            )
 
     def _get_band_from_frequency(self, freq_mhz: float) -> str:
         """Determine band from frequency."""
@@ -681,6 +737,7 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                 sample_rate=self._sample_rate,
                 processed_messages=self._processed_messages,
                 global_unique_stations=len(self._global_unique_stations),
+                wanted_list_size=len(self._wanted_set),
             )
 
         # Personal mode with spot storage
@@ -691,6 +748,7 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                 connected=self._connected,
                 health=health,
                 monitor_type=self._monitor_type,
+                wanted_list_size=len(self._wanted_set),
             )
 
         stats_cutoff = time.time() - self._stats_window
@@ -703,6 +761,7 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                 connected=self._connected,
                 health=health,
                 monitor_type=self._monitor_type,
+                wanted_list_size=len(self._wanted_set),
             )
 
         unique_stations: set[str] = set()
@@ -830,6 +889,11 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                 countries_list=sorted(band_countries),
             )
 
+        # Wanted list window tracking (v2.4.0)
+        wanted_cutoff = time.time() - self._stats_window
+        wanted_in_window = sum(1 for t in self._wanted_match_times if t > wanted_cutoff)
+        self._wanted_match_times = [t for t in self._wanted_match_times if t > wanted_cutoff]
+
         return PSKReporterData(
             spots=self._spots,
             total_spots=len(recent_spots),
@@ -858,6 +922,10 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
             spots_last_hour=spots_last_hour,
             dx_ratio=round(dx_ratio, 1),
             propagation_score=propagation_score,
+            # Wanted list (v2.4.0)
+            wanted_match=wanted_in_window > 0,
+            wanted_match_count=wanted_in_window,
+            wanted_list_size=len(self._wanted_set),
         )
 
     async def _async_update_data(self) -> PSKReporterData:

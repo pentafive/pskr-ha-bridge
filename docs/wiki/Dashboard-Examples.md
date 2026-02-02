@@ -502,6 +502,61 @@ automation:
           message: "New DX record: {{ states('sensor.pskreporter_w1abc_maximum_distance') }} km"
 ```
 
+### Wanted DXCC/Band Alert (v2.4.0)
+
+Get notified when a wanted DXCC/band combination is spotted. Requires the DXCC/Band Wanted List to be configured in integration options (e.g., `339:20m,150:40m`).
+
+**Option A: Event-based (instant, HACS only)**
+
+```yaml
+automation:
+  - alias: "Wanted DXCC Spot Alert"
+    trigger:
+      - platform: event
+        event_type: pskr_wanted_spot
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "Wanted DXCC Spotted!"
+          message: >
+            {{ trigger.event.data.sender_callsign }} → {{ trigger.event.data.receiver_callsign }}
+            on {{ trigger.event.data.band }} ({{ trigger.event.data.mode }})
+            DXCC {{ trigger.event.data.matched_dxcc }} | SNR {{ trigger.event.data.snr }} dB
+            Distance: {{ trigger.event.data.distance_km | round(0) }} km
+```
+
+**Option B: Binary sensor-based (works with both HACS and Docker)**
+
+```yaml
+automation:
+  - alias: "Wanted Match Alert"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.pskreporter_w1abc_wanted_match
+        to: "on"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "Wanted DXCC Match!"
+          message: >
+            {{ state_attr('binary_sensor.pskreporter_w1abc_wanted_match', 'match_count') }} match(es)
+            from wanted list of {{ state_attr('binary_sensor.pskreporter_w1abc_wanted_match', 'wanted_list_size') }} entries
+```
+
+### Wanted Match Dashboard Card (v2.4.0)
+
+```yaml
+type: entities
+title: DXCC Wanted List
+entities:
+  - entity: binary_sensor.pskreporter_w1abc_wanted_match
+    name: Wanted Match Active
+  - entity: sensor.pskreporter_w1abc_wanted_matches
+    name: Matches (this window)
+  - entity: sensor.pskreporter_w1abc_wanted_list_size
+    name: Wanted List Entries
+```
+
 ---
 
 ## Entity Mapping (Docker → HACS)
@@ -538,6 +593,14 @@ If you're migrating from the Docker/MQTT bridge to the HACS integration, use thi
 | `binary_sensor.pskreporter_{call}_feed_health` | Simple ON/OFF health |
 | `sensor.pskreporter_{call}_connection_uptime` | Connection duration |
 | `sensor.pskreporter_{call}_reconnect_count` | Reconnection counter |
+
+### v2.4.0 New Sensors
+
+| Entity | Purpose |
+|--------|---------|
+| `sensor.pskreporter_{call}_wanted_matches` | Wanted DXCC/band match count in stats window |
+| `sensor.pskreporter_{call}_wanted_list_size` | Number of entries in wanted list config |
+| `binary_sensor.pskreporter_{call}_wanted_match` | ON when a wanted match occurred in stats window |
 
 ### v2.3.0 New Sensors
 

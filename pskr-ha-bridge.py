@@ -58,6 +58,8 @@ from config import (
     SPOT_FILTERED_CALLSIGNS,
     SPOT_ALLOW_COUNTRIES,
     SPOT_FILTERED_COUNTRIES,
+    SPOT_BAND_FILTER,
+    DXCC_WANTED,
     HA_DISCOVERY_PREFIX,
     HA_ENTITY_BASE,
 )
@@ -65,8 +67,30 @@ from config import (
 # ==============================================================================
 # --- Other Global Variables & Constants ---
 # ==============================================================================
-SCRIPT_VERSION = "2.2.0"  # Sync with HACS (health features pending)
+SCRIPT_VERSION = "2.4.0"
 MAX_SPOT_HISTORY = 5000
+
+# --- Wanted List Parser (standalone, no custom_components import) ---
+def _parse_wanted_list(value):
+    """Parse DXCC:Band wanted list from config string."""
+    if not value or not value.strip():
+        return set()
+    result = set()
+    for item in value.split(","):
+        item = item.strip()
+        if ":" not in item:
+            continue
+        parts = item.split(":", 1)
+        dxcc = parts[0].strip()
+        band = parts[1].strip().lower()
+        if dxcc and band:
+            result.add((dxcc, band))
+    return result
+
+# --- Band Filter & Wanted List ---
+BAND_FILTER_SET = {b.lower() for b in SPOT_BAND_FILTER} if SPOT_BAND_FILTER else set()
+WANTED_SET = _parse_wanted_list(DXCC_WANTED)
+wanted_match_times = []
 
 # --- State Variables ---
 spot_session_stats = {}
@@ -384,6 +408,65 @@ def update_band_stats_task():
                  publish_stat_update(ha_client, direction=direction, metric="avg_snr", value=round(avg_snr, 1), band=band, signal_mode=mode)
                  publish_stat_update(ha_client, direction=direction, metric=unique_station_metric, value=unique_stations, band=band, signal_mode=mode)
 
+    # --- Wanted List Sensors ---
+    if WANTED_SET and ha_client.is_connected():
+        current_time = time.time()
+        # Prune old matches outside stats window
+        while wanted_match_times and wanted_match_times[0] < current_time - STATS_INTERVAL_WINDOW_SECONDS:
+            wanted_match_times.pop(0)
+        match_count = len(wanted_match_times)
+        has_match = match_count > 0
+
+        # Publish discovery for wanted sensors (on first direction only to avoid dupes)
+        direction = directions_to_process[0] if directions_to_process else "rx"
+
+        # Binary sensor: wanted match
+        wanted_binary_uid = f"{HA_ENTITY_BASE}_wanted_match_{SAFE_MY_CALLSIGN}"
+        wanted_binary_config_topic = f"{HA_DISCOVERY_PREFIX}/binary_sensor/{wanted_binary_uid}/config"
+        wanted_binary_state_topic = f"{HA_ENTITY_BASE}/wanted/{SAFE_MY_CALLSIGN}/match/state"
+        wanted_binary_payload = {
+            "name": "Wanted Match",
+            "state_topic": wanted_binary_state_topic,
+            "unique_id": wanted_binary_uid,
+            "icon": "mdi:target",
+            "payload_on": "ON",
+            "payload_off": "OFF",
+            "device": get_stats_device_config(direction),
+        }
+        publish_mqtt(ha_client, wanted_binary_config_topic, json.dumps(wanted_binary_payload), retain=True)
+        publish_mqtt(ha_client, wanted_binary_state_topic, "ON" if has_match else "OFF")
+
+        # Sensor: wanted match count
+        wanted_count_uid = f"{HA_ENTITY_BASE}_wanted_match_count_{SAFE_MY_CALLSIGN}"
+        wanted_count_config_topic = f"{HA_DISCOVERY_PREFIX}/sensor/{wanted_count_uid}/config"
+        wanted_count_state_topic = f"{HA_ENTITY_BASE}/wanted/{SAFE_MY_CALLSIGN}/match_count/state"
+        wanted_count_payload = {
+            "name": "Wanted Matches",
+            "state_topic": wanted_count_state_topic,
+            "unique_id": wanted_count_uid,
+            "icon": "mdi:counter",
+            "unit_of_measurement": "matches",
+            "state_class": "measurement",
+            "device": get_stats_device_config(direction),
+        }
+        publish_mqtt(ha_client, wanted_count_config_topic, json.dumps(wanted_count_payload), retain=True)
+        publish_mqtt(ha_client, wanted_count_state_topic, match_count)
+
+        # Sensor: wanted list size
+        wanted_size_uid = f"{HA_ENTITY_BASE}_wanted_list_size_{SAFE_MY_CALLSIGN}"
+        wanted_size_config_topic = f"{HA_DISCOVERY_PREFIX}/sensor/{wanted_size_uid}/config"
+        wanted_size_state_topic = f"{HA_ENTITY_BASE}/wanted/{SAFE_MY_CALLSIGN}/list_size/state"
+        wanted_size_payload = {
+            "name": "Wanted List Size",
+            "state_topic": wanted_size_state_topic,
+            "unique_id": wanted_size_uid,
+            "icon": "mdi:format-list-numbered",
+            "unit_of_measurement": "entries",
+            "device": get_stats_device_config(direction),
+        }
+        publish_mqtt(ha_client, wanted_size_config_topic, json.dumps(wanted_size_payload), retain=True)
+        publish_mqtt(ha_client, wanted_size_state_topic, len(WANTED_SET))
+
     # Schedule the next update
     if not stop_event.is_set():
         stats_timer = threading.Timer(STATS_UPDATE_INTERVAL_SECONDS, update_band_stats_task)
@@ -482,6 +565,24 @@ def on_message_psk(client, userdata, msg):
         with state_lock:
             all_spots_history.append(( timestamp_unix, band, dist_km, snr, sender_call_orig, receiver_call_orig, signal_mode, sender_adif, receiver_adif ))
 
+        # Check wanted list (runs on ALL spots, independent of spot sensor filters)
+        if WANTED_SET:
+            band_lower = band.lower() if band else ""
+            matched = False
+            if SCRIPT_DIRECTION.lower() in ("rx", "dual") and is_rx_spot:
+                if sender_adif and (str(sender_adif), band_lower) in WANTED_SET:
+                    matched = True
+                    matched_dxcc, matched_band = str(sender_adif), band_lower
+            if not matched and SCRIPT_DIRECTION.lower() in ("tx", "dual") and is_tx_spot:
+                if receiver_adif and (str(receiver_adif), band_lower) in WANTED_SET:
+                    matched = True
+                    matched_dxcc, matched_band = str(receiver_adif), band_lower
+            if matched:
+                wanted_match_times.append(time.time())
+                if DEBUG_MODE:
+                    print(f"DEBUG: WANTED MATCH! DXCC={matched_dxcc} Band={matched_band} "
+                          f"Spot: {sender_call_orig}->{receiver_call_orig}")
+
         # Apply Spot Sensor Filtering
         allow_spot_sensor = True
         if not ENABLE_SPOT_SENSORS: allow_spot_sensor = False
@@ -496,6 +597,8 @@ def on_message_psk(client, userdata, msg):
                 if not (sender_call_orig.upper() in ALLOW_CALLS_UPPER or receiver_call_orig.upper() in ALLOW_CALLS_UPPER): allow_spot_sensor = False
             if allow_spot_sensor and SPOT_ALLOW_COUNTRIES:
                  if not (sender_adif in ALLOW_COUNTRIES_SET or receiver_adif in ALLOW_COUNTRIES_SET): allow_spot_sensor = False
+            if allow_spot_sensor and BAND_FILTER_SET:
+                 if band and band.lower() not in BAND_FILTER_SET: allow_spot_sensor = False
         if DEBUG_MODE: print(f"DEBUG: Spot {sender_call_orig}->{receiver_call_orig}: Filter decision = {allow_spot_sensor}")
 
         # Update/Publish Spot Sensor (Only if Allowed)
@@ -541,6 +644,8 @@ if __name__ == "__main__":
         print(f"INFO: Spot Filter Allow Countries (ADIF): {'Any' if not SPOT_ALLOW_COUNTRIES else SPOT_ALLOW_COUNTRIES}")
         print(f"INFO: Spot Filter Filtered Countries (ADIF): {'None' if not SPOT_FILTERED_COUNTRIES else SPOT_FILTERED_COUNTRIES}")
         print(f"INFO: Spot Filter Min Distance (Km): {'Disabled' if SPOT_FILTER_MIN_DISTANCE_KM <= 0 else SPOT_FILTER_MIN_DISTANCE_KM}")
+        print(f"INFO: Spot Band Filter: {'All bands' if not BAND_FILTER_SET else sorted(BAND_FILTER_SET)}")
+    print(f"INFO: DXCC Wanted List: {'None' if not WANTED_SET else f'{len(WANTED_SET)} entries'}")
     print(f"INFO: Debug Mode Enabled: {DEBUG_MODE}")
 
     psk_transport_protocol = "tcp"; psk_port = 1883; use_tls = False # Default to standard MQTT TCP

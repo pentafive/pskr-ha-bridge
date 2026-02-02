@@ -16,6 +16,7 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    CONF_BAND_FILTER,
     CONF_CALLSIGN,
     CONF_CALLSIGN_ALLOW,
     CONF_CALLSIGN_BLOCK,
@@ -23,6 +24,7 @@ from .const import (
     CONF_COUNTRY_ALLOW,
     CONF_COUNTRY_BLOCK,
     CONF_DIRECTION,
+    CONF_DXCC_WANTED,
     CONF_MAX_DISTANCE,
     CONF_MIN_DISTANCE,
     CONF_MODE_FILTER,
@@ -37,6 +39,7 @@ from .const import (
     DIRECTION_RX,
     DIRECTION_TX,
     DOMAIN,
+    HF_BANDS,
     MONITOR_GLOBAL,
     MONITOR_PERSONAL,
     TRANSPORT_MQTT,
@@ -229,6 +232,17 @@ class PSKReporterOptionsFlow(OptionsFlow):
                     mode=SelectSelectorMode.DROPDOWN,
                 )
             )
+            # Band filter multi-select (v2.4.0)
+            schema_dict[vol.Optional(
+                CONF_BAND_FILTER,
+                default=options.get(CONF_BAND_FILTER, []),
+            )] = SelectSelector(
+                SelectSelectorConfig(
+                    options=HF_BANDS,
+                    multiple=True,
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            )
             # Callsign allow/block lists (comma-separated strings converted to lists)
             schema_dict[vol.Optional(
                 CONF_CALLSIGN_ALLOW,
@@ -246,6 +260,11 @@ class PSKReporterOptionsFlow(OptionsFlow):
             schema_dict[vol.Optional(
                 CONF_COUNTRY_BLOCK,
                 default=",".join(options.get(CONF_COUNTRY_BLOCK, [])),
+            )] = str
+            # DXCC/Band wanted list (v2.4.0)
+            schema_dict[vol.Optional(
+                CONF_DXCC_WANTED,
+                default=options.get(CONF_DXCC_WANTED, ""),
             )] = str
 
         return self.async_show_form(

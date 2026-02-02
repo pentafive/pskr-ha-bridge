@@ -26,9 +26,15 @@ async def async_setup_entry(
     """Set up PSKReporter binary sensors based on a config entry."""
     coordinator: PSKReporterCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    async_add_entities([
+    entities: list[BinarySensorEntity] = [
         PSKReporterFeedHealthBinarySensor(coordinator),
-    ])
+    ]
+
+    # Only add wanted match sensor for personal mode (v2.4.0)
+    if coordinator.monitor_type != MONITOR_GLOBAL:
+        entities.append(PSKReporterWantedMatchBinarySensor(coordinator))
+
+    async_add_entities(entities)
 
 
 class PSKReporterFeedHealthBinarySensor(
@@ -59,7 +65,7 @@ class PSKReporterFeedHealthBinarySensor(
                 name="PSKReporter - Global Monitor",
                 manufacturer="PSKReporter.info",
                 model="PSKReporter HA Bridge (Global)",
-                sw_version="2.2.0",
+                sw_version="2.4.0",
                 configuration_url="https://pskreporter.info",
             )
         return DeviceInfo(
@@ -67,7 +73,7 @@ class PSKReporterFeedHealthBinarySensor(
             name=f"PSKReporter - {self.coordinator.callsign}",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge",
-            sw_version="2.2.0",
+            sw_version="2.4.0",
             configuration_url="https://pskreporter.info",
         )
 
@@ -91,4 +97,48 @@ class PSKReporterFeedHealthBinarySensor(
             "healthy_threshold_seconds": health.health_threshold_seconds,
             "feed_status": health.feed_status,  # v2.2.0: healthy, low_activity, stale, disconnected
             "reason": health.feed_status_reason,  # v2.2.0: uses coordinator's reason
+        }
+
+
+class PSKReporterWantedMatchBinarySensor(
+    CoordinatorEntity[PSKReporterCoordinator], BinarySensorEntity
+):
+    """Binary sensor indicating a wanted DXCC/band match occurred (v2.4.0)."""
+
+    _attr_attribution = ATTRIBUTION
+    _attr_has_entity_name = True
+    _attr_translation_key = "wanted_match"
+
+    def __init__(self, coordinator: PSKReporterCoordinator) -> None:
+        """Initialize the binary sensor."""
+        super().__init__(coordinator)
+        self._attr_unique_id = (
+            f"{coordinator.callsign}_{coordinator.direction}_wanted_match"
+        )
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device information."""
+        return DeviceInfo(
+            identifiers={
+                (DOMAIN, f"{self.coordinator.callsign}_{self.coordinator.direction}")
+            },
+            name=f"PSKReporter - {self.coordinator.callsign}",
+            manufacturer="PSKReporter.info",
+            model="PSKReporter HA Bridge",
+            sw_version="2.4.0",
+            configuration_url="https://pskreporter.info",
+        )
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if a wanted match occurred within the stats window."""
+        return self.coordinator.data.wanted_match
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        return {
+            "match_count": self.coordinator.data.wanted_match_count,
+            "wanted_list_size": self.coordinator.data.wanted_list_size,
         }

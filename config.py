@@ -97,6 +97,8 @@ SPOT_ALLOW_CALLSIGNS = parse_list(os.getenv('SPOT_ALLOW_CALLSIGNS', ''))
 SPOT_FILTERED_CALLSIGNS = parse_list(os.getenv('SPOT_FILTERED_CALLSIGNS', ''))
 SPOT_ALLOW_COUNTRIES = parse_list(os.getenv('SPOT_ALLOW_COUNTRIES', ''))
 SPOT_FILTERED_COUNTRIES = parse_list(os.getenv('SPOT_FILTERED_COUNTRIES', ''))
+SPOT_BAND_FILTER = parse_list(os.getenv('SPOT_BAND_FILTER', ''))
+DXCC_WANTED = os.getenv('DXCC_WANTED', '')
 
 # ==============================================================================
 # --- Home Assistant Integration ---
@@ -204,6 +206,8 @@ def print_config_summary():
         print(f"SPOT_FILTERED_CALLSIGNS:  {SPOT_FILTERED_CALLSIGNS if SPOT_FILTERED_CALLSIGNS else 'None'}")
         print(f"SPOT_ALLOW_COUNTRIES:     {SPOT_ALLOW_COUNTRIES if SPOT_ALLOW_COUNTRIES else 'Any'}")
         print(f"SPOT_FILTERED_COUNTRIES:  {SPOT_FILTERED_COUNTRIES if SPOT_FILTERED_COUNTRIES else 'None'}")
+        print(f"SPOT_BAND_FILTER:         {SPOT_BAND_FILTER if SPOT_BAND_FILTER else 'All bands'}")
+        print(f"DXCC_WANTED:              {DXCC_WANTED if DXCC_WANTED else 'None'}")
 
     print(f"STATS_WINDOW:             {STATS_INTERVAL_WINDOW_SECONDS}s ({STATS_INTERVAL_WINDOW_SECONDS//60}min)")
     print(f"STATS_UPDATE_INTERVAL:    {STATS_UPDATE_INTERVAL_SECONDS}s ({STATS_UPDATE_INTERVAL_SECONDS//60}min)")

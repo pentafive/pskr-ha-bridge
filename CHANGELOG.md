@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-02-02
+
+### Added
+- **Band Filter** - Filter spots by amateur radio band (e.g., 20m, 40m, 6m)
+  - HACS: Multi-select dropdown in integration options
+  - Docker: `SPOT_BAND_FILTER` environment variable (comma-separated)
+- **DXCC/Band Wanted List** - Detector system that fires events when specific DXCC/band combinations are spotted
+  - Configure inline as comma-separated `DXCC:BAND` pairs (e.g., `339:20m,150:40m`)
+  - HACS: Text input in integration options
+  - Docker: `DXCC_WANTED` environment variable
+  - New `pskr_wanted_spot` Home Assistant event fired on match (HACS mode)
+  - Direction-aware: RX checks sender DXCC, TX checks receiver DXCC, Dual checks both
+- **Wanted Match Sensors** (Personal mode only):
+  - `wanted_match` binary sensor - ON when a wanted DXCC/band match occurs within the stats window
+  - `wanted_match_count` sensor - Number of wanted matches in the current stats window
+  - `wanted_list_size` sensor - Number of entries in the configured wanted list
+
+### Technical
+- New `wanted_list.py` shared parser module with `parse_wanted_list()` and `format_wanted_list()`
+- Added `CONF_DXCC_WANTED` and `EVENT_WANTED_SPOT` constants
+- Band filter uses O(1) set lookup in `_should_include_spot()`
+- Wanted matching runs on all valid spots independent of spot sensor filters (detector, not filter)
+
+---
+
 ## [2.3.1] - 2026-01-24
 
 ### Added

@@ -19,6 +19,7 @@ CONF_CALLSIGN_ALLOW: Final = "callsign_allow"
 CONF_CALLSIGN_BLOCK: Final = "callsign_block"
 CONF_COUNTRY_ALLOW: Final = "country_allow"
 CONF_COUNTRY_BLOCK: Final = "country_block"
+CONF_DXCC_WANTED: Final = "dxcc_wanted"
 
 # Monitor types
 MONITOR_PERSONAL: Final = "personal"
@@ -131,6 +132,9 @@ SENSOR_MOST_ACTIVE_MODE: Final = "most_active_mode"
 SENSOR_MAX_DISTANCE: Final = "max_distance_km"
 SENSOR_AVG_SNR: Final = "avg_snr"
 SENSOR_SPOTS_PER_MINUTE: Final = "spots_per_minute"
+
+# Event types (v2.4.0)
+EVENT_WANTED_SPOT: Final = "pskr_wanted_spot"
 
 # Attribution
 ATTRIBUTION: Final = "Data provided by PSKReporter.info"

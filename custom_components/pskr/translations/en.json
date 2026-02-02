@@ -48,7 +48,9 @@
           "callsign_allow": "Callsign Allow List",
           "callsign_block": "Callsign Block List",
           "country_allow": "Country Allow List (DXCC)",
-          "country_block": "Country Block List (DXCC)"
+          "country_block": "Country Block List (DXCC)",
+          "band_filter": "Band Filter",
+          "dxcc_wanted": "DXCC/Band Wanted List"
         },
         "data_description": {
           "transport": "MQTT transport method for connecting to PSKReporter (WebSocket+TLS recommended)",
@@ -60,7 +62,9 @@
           "callsign_allow": "Only include spots involving these callsigns (comma-separated, e.g., W1AW,K1ABC)",
           "callsign_block": "Exclude spots involving these callsigns (comma-separated)",
           "country_allow": "Only include spots from these DXCC country codes (comma-separated, e.g., 291,100)",
-          "country_block": "Exclude spots from these DXCC country codes (comma-separated)"
+          "country_block": "Exclude spots from these DXCC country codes (comma-separated)",
+          "band_filter": "Only include spots on these bands (empty = all bands)",
+          "dxcc_wanted": "DXCC:Band pairs to watch for (comma-separated, e.g., 339:20m,150:40m). Fires events on match."
         }
       }
     }
@@ -157,6 +161,12 @@
       "propagation_score": {
         "name": "Propagation Score"
       },
+      "wanted_match_count": {
+        "name": "Wanted Matches"
+      },
+      "wanted_list_size": {
+        "name": "Wanted List Size"
+      },
       "band_spots": {
         "name": "{band} Spots"
       },
@@ -176,6 +186,9 @@
     "binary_sensor": {
       "feed_health": {
         "name": "Feed Health"
+      },
+      "wanted_match": {
+        "name": "Wanted Match"
       }
     }
   }

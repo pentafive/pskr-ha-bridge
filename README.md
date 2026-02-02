@@ -19,6 +19,8 @@ Monitor amateur radio digital mode propagation from [PSKReporter.info](https://p
 - **Feed Health Monitoring** - Real-time MQTT connection and data flow status
 - **Low-Resource Mode** - Count-only option for memory-constrained devices
 - **Rate Limiting** - Configurable message sampling for global monitoring
+- **Band Filtering** - Focus on specific bands (e.g., 20m, 40m, 6m)
+- **DXCC Wanted List** - Get alerts when specific DXCC/band combinations are spotted
 - **Two Deployment Options** - Native HACS integration or Docker/MQTT bridge
 
 ## Monitor Modes
@@ -94,6 +96,8 @@ For container deployment or MQTT-based integration:
 | **Geographic** | Farthest Station | Callsign of farthest contact | callsign |
 | **Derived** | DX Ratio | % of spots > 5000 km | % |
 | **Derived** | Propagation Score | Composite quality metric | score |
+| **Wanted** | Wanted Matches | Matches in current stats window | matches |
+| **Wanted** | Wanted List Size | Configured wanted list entries | entries |
 | **Per-Band** | {band} Spots | Spot count on each HF band (160m-6m) | spots |
 | **Per-Band** | {band} Avg SNR | Average SNR per band | dB |
 | **Per-Band** | {band} Max Distance | Farthest spot per band | km |
@@ -108,7 +112,7 @@ For container deployment or MQTT-based integration:
 | **Health** | Sequence Gaps | Missed messages detected | count |
 | **Health** | Parse Errors | Malformed messages | count |
 
-**v2.3.0:** Personal mode now includes 75 sensors total (9 activity + 9 extended + 7 health + 50 per-band).
+**v2.4.0:** Personal mode now includes 78 sensors + 2 binary sensors (9 activity + 9 extended + 2 wanted + 7 health + 50 per-band + 1 feed health binary + 1 wanted match binary).
 
 ### Global Monitor Sensors
 
@@ -135,6 +139,7 @@ For container deployment or MQTT-based integration:
 | Sensor | Description |
 |--------|-------------|
 | Feed Health | ON when data flowing, OFF when stale (personal: >300s, global: >60s) |
+| Wanted Match | ON when a wanted DXCC/band combo was spotted in the stats window (personal only) |
 
 ## Understanding the Data
 
@@ -180,6 +185,21 @@ Per-band sensors show relative propagation conditions:
 - **High counts** = Band is open, propagation is good
 - **Low/zero counts** = Band closed or inactive
 
+### DXCC/Band Wanted List
+
+**v2.4.0+:** Configure a list of DXCC country/band combinations you're chasing. When a matching spot appears, the integration fires a `pskr_wanted_spot` event (HACS) or publishes MQTT sensors (Docker).
+
+**Format:** Comma-separated `DXCC_CODE:BAND` pairs. Example: `339:20m,150:40m,100:6m`
+
+Find DXCC codes at [country-files.com](https://www.country-files.com/category/adif-country-files/).
+
+The wanted list is a **detector, not a filter** — all spots still flow normally through your existing filters. Wanted matches trigger additional sensors and events on top of normal operation.
+
+**Direction-aware matching:**
+- **RX mode:** Checks the sender's DXCC code (who is calling you)
+- **TX mode:** Checks the receiver's DXCC code (who heard you)
+- **Dual mode:** Checks both directions
+
 ## Configuration
 
 ### HACS Integration
@@ -221,6 +241,8 @@ Configure filtering via **Settings > Devices & Services > PSKReporter > Configur
 | Callsign Block List | Exclude spots involving these callsigns (comma-separated) | Empty |
 | Country Allow List | Only include spots from these DXCC codes (comma-separated) | Empty |
 | Country Block List | Exclude spots from these DXCC codes (comma-separated) | Empty |
+| Band Filter | Only include spots on these bands (multi-select) | All |
+| DXCC/Band Wanted List | DXCC:Band pairs to watch for — fires events on match (e.g., `339:20m,150:40m`) | Empty |
 
 ### Docker Bridge
 
@@ -232,6 +254,8 @@ All configuration via environment variables. See `.env.example` for the full lis
 | `HA_MQTT_BROKER` | MQTT broker host | `homeassistant.local` |
 | `HA_MQTT_PASS` | MQTT password | `""` |
 | `SCRIPT_DIRECTION` | `rx`, `tx`, or `dual` | `rx` |
+| `SPOT_BAND_FILTER` | Only include these bands (comma-separated, e.g., `20m,40m,6m`) | `""` (all) |
+| `DXCC_WANTED` | DXCC:Band pairs to watch for (e.g., `339:20m,150:40m`) | `""` |
 
 ## Requirements
 

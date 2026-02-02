@@ -39,11 +39,12 @@ The setup wizard asks you to choose a monitor type first:
 
 ## Sensors Overview
 
-### Personal Monitor (75 sensors in v2.3.0)
+### Personal Monitor (78 sensors + 2 binary sensors in v2.4.0)
 - **Activity:** Total Spots, Unique Stations, Spots/min, Spots (1h), Last Spot
 - **Propagation:** Most Active Band/Mode, Min/Avg/Max Distance, Min/Avg/Max SNR
 - **Geographic:** Unique Countries, Farthest Station
 - **Derived:** DX Ratio (% > 5000km), Propagation Score
+- **Wanted:** Wanted Matches, Wanted List Size (+ Wanted Match binary sensor)
 - **Per-Band (50 sensors):** For each HF band (160m-6m): Spots, Avg SNR, Max Distance, Stations, Countries
 - **Health:** Connection Status, Feed Status, Message Rate, Latency, Uptime
 
@@ -54,6 +55,12 @@ The setup wizard asks you to choose a monitor type first:
 - Health: Same as personal
 
 ## What's New
+
+### v2.4.0 Features
+
+- **Band Filter** - Focus on specific bands (e.g., 20m, 40m, 6m) via multi-select (HACS) or `SPOT_BAND_FILTER` env var (Docker)
+- **DXCC/Band Wanted List** - Configure DXCC:Band pairs to watch for (e.g., `339:20m,150:40m`). Fires `pskr_wanted_spot` events on match (HACS) or publishes MQTT sensors (Docker). Direction-aware: RX checks sender DXCC, TX checks receiver, Dual checks both.
+- **Wanted Match Sensors** - `wanted_match` binary sensor (ON when matched), `wanted_match_count` sensor, `wanted_list_size` sensor (personal mode only)
 
 ### v2.3.0 Features
 
