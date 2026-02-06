@@ -74,7 +74,7 @@ from config import (
 # ==============================================================================
 # --- Other Global Variables & Constants ---
 # ==============================================================================
-SCRIPT_VERSION = "2.5.0"
+SCRIPT_VERSION = "2.5.1"
 MAX_SPOT_HISTORY = 5000
 
 # --- Wanted List Parser (standalone, no custom_components import) ---

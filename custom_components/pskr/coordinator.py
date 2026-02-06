@@ -407,7 +407,7 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
             157: "Server moved",
             159: "Connection rate exceeded",
         }
-        code_int = int(reason_code)
+        code_int = reason_code.value if hasattr(reason_code, "value") else int(reason_code)
         name = reason_map.get(code_int)
         if name:
             return f"{name} (rc={code_int})"

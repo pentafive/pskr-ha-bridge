@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.1] - 2026-02-06
+
+### Fixed
+- **ReasonCode TypeError** - Fix `TypeError: int() argument must be a string` crash on MQTT disconnect with paho-mqtt v2 (`ReasonCode` object now accessed via `.value` attribute)
+
+---
+
 ## [2.5.0] - 2026-02-06
 
 ### Added

@@ -425,7 +425,7 @@ class PSKReporterSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity)
                 name="PSKReporter - Global Monitor",
                 manufacturer="PSKReporter.info",
                 model="PSKReporter HA Bridge (Global)",
-                sw_version="2.5.0",
+                sw_version="2.5.1",
                 configuration_url="https://pskreporter.info",
             )
         return DeviceInfo(
@@ -433,7 +433,7 @@ class PSKReporterSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity)
             name=f"PSKReporter - {self.coordinator.callsign}",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge",
-            sw_version="2.5.0",
+            sw_version="2.5.1",
             configuration_url="https://pskreporter.info",
         )
 
@@ -480,7 +480,7 @@ class PSKReporterBandSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEnt
             name="PSKReporter - Global Monitor",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge (Global)",
-            sw_version="2.5.0",
+            sw_version="2.5.1",
             configuration_url="https://pskreporter.info",
         )
 
@@ -582,7 +582,7 @@ class PSKReporterPersonalBandSensor(CoordinatorEntity[PSKReporterCoordinator], S
             name=f"PSKReporter - {self.coordinator.callsign}",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge",
-            sw_version="2.5.0",
+            sw_version="2.5.1",
             configuration_url="https://pskreporter.info",
         )
 
