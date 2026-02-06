@@ -2,45 +2,42 @@
 
 Future enhancements for pskr-ha-bridge.
 
-## v2.4.0 - Band Filter & DXCC Wanted List
-
-*DXCC/band wanted list requested by VK3GA — requirements confirmed 2026-02-02*
-
-- [ ] **Band filter activation** - Wire existing `CONF_BAND_FILTER` into filtering logic (HACS + Docker)
-- [ ] **Band filter UI** - Multi-select in HACS options flow, `SPOT_BAND_FILTER` env var for Docker
-- [ ] **Wanted list matching** - Direction-aware DXCC+band combo detection (RX, TX, or both)
-- [ ] **Wanted list config** - Inline configuration: comma-separated `DXCC:BAND` env var (Docker), text input in HACS options flow
-- [ ] **Wanted match sensors** - Binary sensor (on/off), match count, list size diagnostic
-- [ ] **HA event** - `pskr_wanted_spot` event for automations (push notifications, alerts)
-- [ ] **Tests** - Unit tests for wanted list parsing and matching
-- [ ] **Documentation** - Wiki page, example automations, .env.example updates
-
-## v2.5.0 - Wanted List Import & Enrichment
-
-- [ ] **Wanted list file import** - Load from text file (`DXCC:BAND` per line), file path in HACS options, Docker file mount
-- [ ] **ClubLog API integration** - Auto-build wanted list from QSO history via ClubLog API (suggested by VK3GA)
-- [ ] **ADIF file import** - Parse LoTW/Club Log exports to derive needed DXCC/band combos
-- [ ] **DXCC name mapping** - Human-readable country names alongside ADIF numeric codes in sensors/events
-
 ## v2.6.x - Dashboard Generator Improvements
 
-- [ ] **Global-only dashboard** - Generate dashboard without callsign for global monitor only
 - [ ] **Preset tiers** - Minimal | Standard | Full complexity options
 - [ ] **Minimal preset** - Fewer cards, simpler layout for basic monitoring
 
 ## v2.7.x - Advanced Features
 
-- [ ] **Bearing/direction sensors** - Calculate bearing from Maidenhead locators (requires pyhamtools enhancement)
 - [ ] **Activity heatmap data** - Hour × Band matrix as sensor attribute
 - [ ] **Contest mode** - Track unique multipliers for contest logging
 
 ## Future Considerations
 
+- [ ] **Wanted list file import** - Load from text file (`DXCC:BAND` per line), file path in HACS options, Docker file mount
+- [ ] **ADIF file import** - Parse LoTW/Club Log exports to derive needed DXCC/band combos
 - [ ] **DX cluster integration** - Cross-reference spots with DX cluster data
 - [ ] **QRZ.com lookup** - Enrich spot data with operator info
 - [ ] **Multi-rig support** - Track spots from multiple stations/antennas with unified dashboard
 
 ## Completed
+
+### v2.5.0
+- [x] DXCC name mapping — human-readable country names in sensor attributes
+- [x] Bearing/direction sensor — dominant direction with compass heading
+- [x] Dashboard `views:` wrapper — paste directly into HA Raw Configuration Editor
+- [x] Global-only dashboard — generate dashboard without callsign
+- [x] MQTT disconnect log rate-limiting — fix log spam bug
+
+### v2.4.0
+- [x] Band filter activation — wire `CONF_BAND_FILTER` into filtering logic
+- [x] Band filter UI — multi-select in HACS, `SPOT_BAND_FILTER` env var for Docker
+- [x] Wanted list matching — direction-aware DXCC+band combo detection
+- [x] Wanted list config — inline `DXCC:BAND` pairs
+- [x] Wanted match sensors — binary sensor, match count, list size
+- [x] HA event — `pskr_wanted_spot` event for automations
+- [x] Tests — unit tests for wanted list parsing and matching
+- [x] Documentation — wiki page, example automations
 
 ### v2.3.1
 - [x] Web-based dashboard generator
@@ -59,4 +56,4 @@ Future enhancements for pskr-ha-bridge.
 
 ---
 
-*Last updated: 2026-02-02*
+*Last updated: 2026-02-06*

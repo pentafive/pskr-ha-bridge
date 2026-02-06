@@ -243,7 +243,18 @@ EXTENDED_SENSOR_DESCRIPTIONS: tuple[PSKReporterSensorEntityDescription, ...] = (
         key="farthest_station",
         translation_key="farthest_station",
         value_fn=lambda data: data.farthest_station or None,
-        attr_fn=lambda data: {"distance_km": data.farthest_station_distance},
+        attr_fn=lambda data: {
+            "distance_km": data.farthest_station_distance,
+            "bearing_degrees": data.farthest_station_bearing,
+            "country": data.farthest_station_country,
+        },
+    ),
+    # Bearing/direction (v2.5.0)
+    PSKReporterSensorEntityDescription(
+        key="dominant_direction",
+        translation_key="dominant_direction",
+        value_fn=lambda data: data.dominant_direction or None,
+        attr_fn=lambda data: {"bearing_degrees": data.dominant_bearing},
     ),
     # Temporal
     PSKReporterSensorEntityDescription(
@@ -414,7 +425,7 @@ class PSKReporterSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity)
                 name="PSKReporter - Global Monitor",
                 manufacturer="PSKReporter.info",
                 model="PSKReporter HA Bridge (Global)",
-                sw_version="2.4.0",
+                sw_version="2.5.0",
                 configuration_url="https://pskreporter.info",
             )
         return DeviceInfo(
@@ -422,7 +433,7 @@ class PSKReporterSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity)
             name=f"PSKReporter - {self.coordinator.callsign}",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge",
-            sw_version="2.4.0",
+            sw_version="2.5.0",
             configuration_url="https://pskreporter.info",
         )
 
@@ -469,7 +480,7 @@ class PSKReporterBandSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEnt
             name="PSKReporter - Global Monitor",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge (Global)",
-            sw_version="2.4.0",
+            sw_version="2.5.0",
             configuration_url="https://pskreporter.info",
         )
 
@@ -571,7 +582,7 @@ class PSKReporterPersonalBandSensor(CoordinatorEntity[PSKReporterCoordinator], S
             name=f"PSKReporter - {self.coordinator.callsign}",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge",
-            sw_version="2.4.0",
+            sw_version="2.5.0",
             configuration_url="https://pskreporter.info",
         )
 

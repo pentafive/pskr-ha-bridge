@@ -177,25 +177,42 @@
 <body>
     <div class="container">
         <h1>📡 PSKReporter Dashboard Generator</h1>
-        <p class="subtitle">Generate a Home Assistant dashboard for your amateur radio station <span class="badge">v2.3.0+</span></p>
+        <p class="subtitle">Generate a Home Assistant dashboard for your amateur radio station <span class="badge">v2.5.0+</span></p>
 
         <div class="card">
-            <label for="callsign1">Primary Callsign *</label>
-            <input type="text" id="callsign1" placeholder="W1ABC" maxlength="10">
-            <p class="help">Your amateur radio callsign (required)</p>
+            <div class="checkbox-group" style="margin-bottom: 16px;">
+                <label>
+                    <input type="radio" name="monitorType" id="typePersonal" value="personal" checked onchange="toggleMonitorType()">
+                    Personal + Global
+                </label>
+                <label>
+                    <input type="radio" name="monitorType" id="typeGlobalOnly" value="global" onchange="toggleMonitorType()">
+                    Global Only
+                </label>
+            </div>
 
-            <label for="callsign2" style="margin-top: 20px;">Secondary Callsign (optional)</label>
-            <input type="text" id="callsign2" placeholder="K2DEF" maxlength="10">
-            <p class="help">Add a second callsign for comparison dashboards</p>
+            <div id="callsignInputs">
+                <label for="callsign1">Primary Callsign *</label>
+                <input type="text" id="callsign1" placeholder="W1ABC" maxlength="10">
+                <p class="help">Your amateur radio callsign (required)</p>
+
+                <label for="callsign2" style="margin-top: 20px;">Secondary Callsign (optional)</label>
+                <input type="text" id="callsign2" placeholder="K2DEF" maxlength="10">
+                <p class="help">Add a second callsign for comparison dashboards</p>
+            </div>
 
             <div class="checkbox-group">
-                <label>
+                <label id="globalCheckLabel">
                     <input type="checkbox" id="includeGlobal" checked>
                     Include Global Monitor
                 </label>
-                <label>
+                <label id="bandsCheckLabel">
                     <input type="checkbox" id="includeBands" checked>
                     Include Per-Band Breakdown
+                </label>
+                <label>
+                    <input type="checkbox" id="viewsWrapper" checked>
+                    Wrap for Raw Config Editor
                 </label>
             </div>
 
@@ -243,6 +260,19 @@
 
         // Template cache
         const templates = {};
+
+        function toggleMonitorType() {
+            const isGlobal = document.getElementById('typeGlobalOnly').checked;
+            document.getElementById('callsignInputs').style.display = isGlobal ? 'none' : 'block';
+            document.getElementById('globalCheckLabel').style.display = isGlobal ? 'none' : 'flex';
+            document.getElementById('bandsCheckLabel').style.display = isGlobal ? 'none' : 'flex';
+        }
+
+        function wrapViews(yaml) {
+            const lines = yaml.split('\n');
+            const indented = lines.map(line => '  ' + line).join('\n');
+            return 'views:\n  - ' + indented.substring(4);
+        }
 
         async function loadTemplate(name) {
             if (templates[name]) return templates[name];
@@ -336,12 +366,14 @@
             const errorMsg = document.getElementById('errorMsg');
             errorMsg.style.display = 'none';
 
+            const isGlobalOnly = document.getElementById('typeGlobalOnly').checked;
             const call1 = document.getElementById('callsign1').value.trim().toUpperCase();
             const call2 = document.getElementById('callsign2').value.trim().toUpperCase();
             const includeGlobal = document.getElementById('includeGlobal').checked;
             const includeBands = document.getElementById('includeBands').checked;
+            const useViewsWrapper = document.getElementById('viewsWrapper').checked;
 
-            if (!call1) {
+            if (!isGlobalOnly && !call1) {
                 alert('Please enter your callsign');
                 return;
             }
@@ -350,41 +382,55 @@
             btn.textContent = 'Generating...';
 
             try {
-                const callsigns = call2 ? [call1, call2] : [call1];
-                const numCols = Math.min(callsigns.length + (includeGlobal ? 1 : 0), 3);
+                let yaml;
 
-                // Load header template
-                const headerTemplate = await loadTemplate('header');
-                const header = substitute(headerTemplate, {
-                    CALLSIGNS: callsigns.join(', '),
-                    MAX_COLUMNS: numCols.toString()
-                });
+                if (isGlobalOnly) {
+                    // Global-only mode
+                    const headerTemplate = await loadTemplate('header');
+                    const header = substitute(headerTemplate, {
+                        CALLSIGNS: 'Global Monitor',
+                        MAX_COLUMNS: '1'
+                    });
+                    const sections = [await generateGlobalSection()];
+                    const badges = generateBadges([], true);
+                    yaml = header + sections.join('\n') + '\nbadges:\n' + badges + '\ncards: []\n';
+                } else {
+                    // Personal + Global mode
+                    const callsigns = call2 ? [call1, call2] : [call1];
+                    const numCols = Math.min(callsigns.length + (includeGlobal ? 1 : 0), 3);
 
-                const sections = [];
+                    const headerTemplate = await loadTemplate('header');
+                    const header = substitute(headerTemplate, {
+                        CALLSIGNS: callsigns.join(', '),
+                        MAX_COLUMNS: numCols.toString()
+                    });
 
-                // Callsign sections
-                for (let i = 0; i < callsigns.length; i++) {
-                    sections.push(await generateCallsignSection(callsigns[i], COLORS[i % COLORS.length]));
-                }
+                    const sections = [];
 
-                // Global section
-                if (includeGlobal) {
-                    sections.push(await generateGlobalSection());
-                }
-
-                // Band breakdowns
-                if (includeBands) {
-                    for (const c of callsigns) {
-                        sections.push(await generateBandBreakdown(c));
+                    for (let i = 0; i < callsigns.length; i++) {
+                        sections.push(await generateCallsignSection(callsigns[i], COLORS[i % COLORS.length]));
                     }
+
+                    if (includeGlobal) {
+                        sections.push(await generateGlobalSection());
+                    }
+
+                    if (includeBands) {
+                        for (const c of callsigns) {
+                            sections.push(await generateBandBreakdown(c));
+                        }
+                    }
+
+                    if (callsigns.length > 1) {
+                        sections.push(await generateComparisonSection(callsigns));
+                    }
+
+                    yaml = header + sections.join('\n') + '\nbadges:\n' + generateBadges(callsigns, includeGlobal) + '\ncards: []\n';
                 }
 
-                // Comparison charts
-                if (callsigns.length > 1) {
-                    sections.push(await generateComparisonSection(callsigns));
+                if (useViewsWrapper) {
+                    yaml = wrapViews(yaml);
                 }
-
-                const yaml = header + sections.join('\n') + '\nbadges:\n' + generateBadges(callsigns, includeGlobal) + '\ncards: []\n';
 
                 document.getElementById('output').value = yaml;
                 document.getElementById('outputContainer').classList.add('visible');

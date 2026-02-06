@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-02-06
+
+### Added
+- **DXCC Name Mapping** - Country names now appear alongside ADIF numeric codes in sensor attributes (`countries_list`, `farthest_station`, wanted events)
+- **Bearing/Direction Sensor** - New `dominant_direction` sensor showing compass direction (N/NE/E/SE/S/SW/W/NW) with most spots, plus `bearing_degrees` attribute
+- **Farthest Station Enrichment** - `farthest_station` sensor now includes `bearing_degrees` and `country` attributes
+- **Dashboard Generator: `views:` Wrapper** - Generated YAML now wrapped in `views:` array for direct paste into HA's Raw Configuration Editor (CLI: `--no-views-wrapper` to disable; Web: checkbox)
+- **Dashboard Generator: Global-Only Option** - Generate dashboard for global monitor without requiring a callsign (CLI: `--global-only`; Web: monitor type selector)
+- **BMC Support Badge** - Buy Me a Coffee badge and support section in README
+
+### Fixed
+- **MQTT Disconnect Log Spam** - First disconnect logs WARNING, subsequent disconnects before reconnect log DEBUG only (was: WARNING on every disconnect causing 224+ warnings in 32 minutes)
+- **Better Disconnect Reasons** - Human-readable disconnect reason messages with paho-mqtt reason code mapping
+
+### Changed
+- Sensor count: Personal mode 78 → 79 sensors (+1 `dominant_direction`)
+- README: Added attribution blockquote, support section, and disclaimer; replaced Acknowledgements section
+- Per-band `countries_list` attributes now include country names (e.g., `"291 (United States)"`)
+
+### Technical
+- New `dxcc_names.py` module with ~340 ADIF DXCC entity code → country name mappings
+- `_on_disconnect` rate-limiting via `_disconnect_logged` flag, reset on reconnect
+- `_format_disconnect_reason()` maps paho-mqtt reason codes to human-readable strings
+- `_calculate_heading()` and `_bearing_to_compass()` helper methods
+- `SpotData.sender_azimuth` now populated from pyhamtools heading calculation
+- `PSKReporterData` extended with `dominant_bearing`, `dominant_direction`, `farthest_station_bearing`, `farthest_station_country`
+- Docker bridge: disconnect log rate-limiting with per-client flags
+
+---
+
 ## [2.4.0] - 2026-02-02
 
 ### Added

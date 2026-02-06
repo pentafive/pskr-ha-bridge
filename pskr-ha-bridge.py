@@ -13,6 +13,13 @@ import sys
 import traceback
 import re # For callsign cleaning regex
 
+# DXCC name lookup — use HACS module if available, else inline stub
+try:
+    from custom_components.pskr.dxcc_names import get_dxcc_name
+except ImportError:
+    def get_dxcc_name(code):
+        return str(code)
+
 # --- Dependency Handling & Notes ---
 try:
     from pyhamtools import LookupLib, Callinfo
@@ -67,7 +74,7 @@ from config import (
 # ==============================================================================
 # --- Other Global Variables & Constants ---
 # ==============================================================================
-SCRIPT_VERSION = "2.4.0"
+SCRIPT_VERSION = "2.5.0"
 MAX_SPOT_HISTORY = 5000
 
 # --- Wanted List Parser (standalone, no custom_components import) ---
@@ -95,6 +102,10 @@ wanted_match_times = []
 # --- State Variables ---
 spot_session_stats = {}
 all_spots_history = deque(maxlen=MAX_SPOT_HISTORY)
+
+# --- Disconnect log rate-limiting ---
+psk_disconnect_logged = False
+ha_disconnect_logged = False
 
 # --- Initialization for PyHamtools Lookups ---
 # (Initialization code remains the same)
@@ -474,7 +485,9 @@ def update_band_stats_task():
 
 # --- MQTT Callbacks ---
 def on_connect_psk(client, userdata, flags, rc, properties=None):
+    global psk_disconnect_logged
     if rc == 0:
+        psk_disconnect_logged = False
         print(f"INFO: Connected successfully to PSK Reporter Broker ({PSK_BROKER}). Mode: {SCRIPT_DIRECTION.upper()}")
         topics_to_subscribe = []
         topic_base = "pskr/filter/v2/+/{mode}/{sender}/{receiver}/#"
@@ -494,7 +507,9 @@ def on_connect_psk(client, userdata, flags, rc, properties=None):
     else: print(f"ERROR: Connection to PSK Reporter failed with code {rc}.")
 
 def on_connect_ha(client, userdata, flags, rc, properties=None):
+    global ha_disconnect_logged
     if rc == 0:
+        ha_disconnect_logged = False
         print(f"INFO: Connected successfully to Home Assistant Broker ({HA_MQTT_BROKER}).")
         print("INFO: Re-publishing discovery for known Spot sensors...")
         with state_lock: spot_keys_snapshot = list(spot_session_stats.keys())
@@ -507,11 +522,20 @@ def on_connect_ha(client, userdata, flags, rc, properties=None):
     else: print(f"ERROR: Connection to Home Assistant Broker failed with code {rc}.")
 
 def on_disconnect(client, userdata, flags, rc, properties=None):
+     global psk_disconnect_logged, ha_disconnect_logged
      broker_name = "Unknown"; client_id = "?"
      if hasattr(client, '_client_id'): client_id = client._client_id.decode()
-     if client == psk_client: broker_name = "PSK Reporter"
+     is_psk = client == psk_client
+     if is_psk: broker_name = "PSK Reporter"
      elif client == ha_client: broker_name = "Home Assistant"
-     if rc != 0: print(f"WARNING: Unexpected disconnection from {broker_name} Broker ({client_id})! Result code: {rc}. Will attempt to reconnect.")
+     if rc != 0:
+         already_logged = (psk_disconnect_logged if is_psk else ha_disconnect_logged)
+         if not already_logged:
+             print(f"WARNING: Unexpected disconnection from {broker_name} Broker ({client_id})! Result code: {rc}. Will attempt to reconnect.")
+             if is_psk: psk_disconnect_logged = True
+             else: ha_disconnect_logged = True
+         elif DEBUG_MODE:
+             print(f"DEBUG: Repeated disconnect from {broker_name} (rc={rc})")
      else: print(f"INFO: Disconnected from {broker_name} Broker ({client_id}) normally.")
 
 # --- on_message_psk ---

@@ -7,9 +7,14 @@
   <a href="https://github.com/pentafive/pskr-ha-bridge/releases"><img src="https://img.shields.io/github/v/release/pentafive/pskr-ha-bridge" alt="GitHub Release"></a>
   <a href="https://github.com/pentafive/pskr-ha-bridge/blob/main/LICENSE"><img src="https://img.shields.io/github/license/pentafive/pskr-ha-bridge" alt="License"></a>
   <a href="https://github.com/pentafive/pskr-ha-bridge/actions/workflows/hacs-validation.yml"><img src="https://github.com/pentafive/pskr-ha-bridge/actions/workflows/hacs-validation.yml/badge.svg" alt="HACS Validation"></a>
+  <a href="https://buymeacoffee.com/pentafive"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Support-FFDD00?logo=buymeacoffee&logoColor=black" alt="Buy Me a Coffee"></a>
 </p>
 
 Monitor amateur radio digital mode propagation from [PSKReporter.info](https://pskreporter.info/) in Home Assistant. Track FT8, FT4, WSPR, and other digital modes with real-time statistics, band activity, and feed health monitoring.
+
+> Data provided by [PSKReporter.info](https://pskreporter.info/), created by Philip Gladstone (N1DQ). MQTT feed provided by [Tom, M0LTE](https://github.com/M0LTE). If you find the MQTT feed valuable, consider [supporting M0LTE on Ko-fi](https://ko-fi.com/m0lte).
+
+> **Disclaimer:** This project is independently developed and is not affiliated with, endorsed by, or connected to PSKReporter.info or its maintainers.
 
 ## Features
 
@@ -92,8 +97,9 @@ For container deployment or MQTT-based integration:
 | **Propagation** | Average SNR | Mean signal-to-noise | dB |
 | **Propagation** | Min SNR | Weakest signal | dB |
 | **Propagation** | Max SNR | Strongest signal | dB |
-| **Geographic** | Unique Countries | DXCC countries worked | countries |
+| **Geographic** | Unique Countries | DXCC countries worked (with names) | countries |
 | **Geographic** | Farthest Station | Callsign of farthest contact | callsign |
+| **Geographic** | Dominant Direction | Compass direction with most spots | direction |
 | **Derived** | DX Ratio | % of spots > 5000 km | % |
 | **Derived** | Propagation Score | Composite quality metric | score |
 | **Wanted** | Wanted Matches | Matches in current stats window | matches |
@@ -112,7 +118,7 @@ For container deployment or MQTT-based integration:
 | **Health** | Sequence Gaps | Missed messages detected | count |
 | **Health** | Parse Errors | Malformed messages | count |
 
-**v2.4.0:** Personal mode now includes 78 sensors + 2 binary sensors (9 activity + 9 extended + 2 wanted + 7 health + 50 per-band + 1 feed health binary + 1 wanted match binary).
+**v2.5.0:** Personal mode now includes 79 sensors + 2 binary sensors (9 activity + 10 extended + 2 wanted + 7 health + 50 per-band + 1 feed health binary + 1 wanted match binary).
 
 ### Global Monitor Sensors
 
@@ -324,15 +330,19 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 Report security vulnerabilities privately. See [SECURITY.md](SECURITY.md).
 
+## Support
+
+If you find this integration useful:
+- [Buy Me a Coffee](https://buymeacoffee.com/pentafive) — Support development of this and other HA integrations
+- [Support M0LTE on Ko-fi](https://ko-fi.com/m0lte) — Tom provides the PSKReporter MQTT feed that makes this integration possible
+
+## Disclaimer
+
+This project is independently developed and is not affiliated with, endorsed by, or connected to [PSKReporter.info](https://pskreporter.info/) or its maintainers. All spot data is provided by the PSKReporter MQTT feed and remains the property of PSKReporter.
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
-
-## Acknowledgements
-
-- **Philip Gladstone, N1DQ** - [PSKReporter.info](https://pskreporter.info/) creator and maintainer
-- **Tom, M0LTE** - Public MQTT feed at mqtt.pskreporter.info
-- **[Home Assistant](https://www.home-assistant.io/)** - Home automation platform
 
 ## Resources
 

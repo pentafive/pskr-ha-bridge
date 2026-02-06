@@ -55,6 +55,7 @@ from .const import (
     TRANSPORT_CONFIG,
     UPDATE_INTERVAL,
 )
+from .dxcc_names import get_dxcc_name
 from .wanted_list import parse_wanted_list
 
 _LOGGER = logging.getLogger(__name__)
@@ -180,6 +181,12 @@ class PSKReporterData:
     dx_ratio: float = 0.0  # % spots > DX_THRESHOLD_KM
     propagation_score: int = 0  # composite metric
 
+    # Bearing/direction (v2.5.0)
+    dominant_bearing: int = 0
+    dominant_direction: str = ""
+    farthest_station_bearing: int = 0
+    farthest_station_country: str = ""
+
     # Wanted list tracking (v2.4.0)
     wanted_match: bool = False
     wanted_match_count: int = 0
@@ -247,6 +254,7 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         self._startup_time = time.time()
         self._message_counter = 0  # For rate limiting
         self._processed_messages = 0  # Processed after rate limiting
+        self._disconnect_logged = False  # Rate-limit disconnect warnings
 
         # Global mode aggregation (count-only, no spot storage)
         self._global_band_counts: dict[str, int] = defaultdict(int)
@@ -334,7 +342,14 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         if reason_code == 0:
             self._connected = True
             self._health.connected_at = time.time()
-            _LOGGER.info("Connected to PSKReporter MQTT")
+            if self._health.reconnect_count > 0:
+                _LOGGER.info(
+                    "Reconnected to PSKReporter MQTT (after %d disconnects)",
+                    self._health.reconnect_count,
+                )
+            else:
+                _LOGGER.info("Connected to PSKReporter MQTT")
+            self._disconnect_logged = False
             self._subscribe_topics()
         else:
             _LOGGER.error("MQTT connection failed: %s", reason_code)
@@ -350,8 +365,53 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         """Handle MQTT disconnection."""
         self._connected = False
         self._health.reconnect_count += 1
-        self._health.last_disconnect_reason = str(reason_code)
-        _LOGGER.warning("Disconnected from PSKReporter MQTT: %s", reason_code)
+        reason_str = self._format_disconnect_reason(reason_code)
+        self._health.last_disconnect_reason = reason_str
+        if not self._disconnect_logged:
+            _LOGGER.warning("Disconnected from PSKReporter MQTT: %s", reason_str)
+            self._disconnect_logged = True
+        else:
+            _LOGGER.debug("Disconnected from PSKReporter MQTT: %s", reason_str)
+
+    @staticmethod
+    def _format_disconnect_reason(reason_code: mqtt.ReasonCode) -> str:
+        """Map paho-mqtt reason codes to human-readable strings."""
+        reason_map = {
+            0: "Normal disconnect",
+            1: "Unspecified error",
+            4: "Disconnect with will message",
+            128: "Unspecified error (server)",
+            129: "Malformed packet",
+            130: "Protocol error",
+            131: "Implementation specific error",
+            132: "Unsupported protocol version",
+            133: "Client identifier not valid",
+            134: "Bad username or password",
+            135: "Not authorized",
+            136: "Server unavailable",
+            137: "Server busy",
+            139: "Server shutting down",
+            141: "Keep alive timeout",
+            142: "Session taken over",
+            143: "Topic filter invalid",
+            144: "Topic name invalid",
+            147: "Receive maximum exceeded",
+            148: "Topic alias invalid",
+            149: "Packet too large",
+            151: "Quota exceeded",
+            152: "Administrative action",
+            153: "Payload format invalid",
+            154: "Retain not supported",
+            155: "QoS not supported",
+            156: "Use another server",
+            157: "Server moved",
+            159: "Connection rate exceeded",
+        }
+        code_int = int(reason_code)
+        name = reason_map.get(code_int)
+        if name:
+            return f"{name} (rc={code_int})"
+        return f"Unknown (rc={code_int})"
 
     def _subscribe_topics(self) -> None:
         """Subscribe to PSKReporter topics based on direction.
@@ -482,10 +542,12 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
             sender_locator = payload.get("sl", "")
             receiver_locator = payload.get("rl", "")
 
-            # Calculate distance if both locators available
+            # Calculate distance and heading if both locators available
             distance_km = 0.0
+            sender_azimuth = 0
             if sender_locator and receiver_locator:
                 distance_km = self._calculate_distance(sender_locator, receiver_locator)
+                sender_azimuth = self._calculate_heading(sender_locator, receiver_locator)
 
             # Get band directly from payload, fallback to calculation
             band = payload.get("b", "")
@@ -505,8 +567,7 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                 sender_dxcc=str(payload.get("sa", "")),
                 receiver_dxcc=str(payload.get("ra", "")),
                 band=band,
-                # Note: azimuth fields left at default (0) - could be calculated from locators
-                # using pyhamtools.locator.calculate_heading() in future enhancement
+                sender_azimuth=sender_azimuth,
                 sequence=int(payload.get("sq", 0)),
             )
         except (KeyError, ValueError, TypeError) as err:
@@ -527,6 +588,27 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         except Exception as err:
             _LOGGER.debug("Distance calculation failed: %s", err)
         return 0.0
+
+    def _calculate_heading(self, loc1: str, loc2: str) -> int:
+        """Calculate heading from loc1 to loc2 in degrees."""
+        try:
+            from pyhamtools.locator import calculate_heading
+
+            loc1 = loc1[:6].upper() if len(loc1) >= 4 else ""
+            loc2 = loc2[:6].upper() if len(loc2) >= 4 else ""
+
+            if len(loc1) >= 4 and len(loc2) >= 4:
+                return int(calculate_heading(loc1, loc2))
+        except Exception as err:
+            _LOGGER.debug("Heading calculation failed: %s", err)
+        return 0
+
+    @staticmethod
+    def _bearing_to_compass(bearing: int) -> str:
+        """Convert bearing degrees to 8-point compass direction."""
+        directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+        index = round(bearing / 45) % 8
+        return directions[index]
 
     def _should_include_spot(self, spot: SpotData) -> bool:
         """Check if spot passes configured filters."""
@@ -589,6 +671,7 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                 "sender_dxcc": spot.sender_dxcc,
                 "receiver_dxcc": spot.receiver_dxcc,
                 "matched_dxcc": matched_dxcc,
+                "matched_country_name": get_dxcc_name(matched_dxcc),
                 "matched_band": spot.band,
             }
             self.hass.loop.call_soon_threadsafe(
@@ -820,15 +903,36 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         # Farthest station details (v2.3.0)
         farthest_station = ""
         farthest_station_distance = 0.0
+        farthest_station_bearing = 0
+        farthest_station_country = ""
         if farthest_spot:
             if self._direction == DIRECTION_TX:
                 farthest_station = farthest_spot.receiver_callsign
+                dxcc_code = farthest_spot.receiver_dxcc
             else:
                 farthest_station = farthest_spot.sender_callsign
+                dxcc_code = farthest_spot.sender_dxcc
+            farthest_station_country = get_dxcc_name(dxcc_code) if dxcc_code else ""
             farthest_station_distance = farthest_spot.distance_km
+            farthest_station_bearing = farthest_spot.sender_azimuth
 
-        # Country list (v2.3.0)
-        countries_list = sorted(countries)
+        # Dominant bearing (v2.5.0) — bearing with most spots
+        bearing_buckets: dict[int, int] = defaultdict(int)
+        for spot in recent_spots:
+            if spot.sender_azimuth > 0:
+                # Bucket to nearest 45 degrees for 8-point compass
+                bucket = round(spot.sender_azimuth / 45) * 45 % 360
+                bearing_buckets[bucket] += 1
+        dominant_bearing = 0
+        dominant_direction = ""
+        if bearing_buckets:
+            dominant_bearing = max(bearing_buckets, key=bearing_buckets.get)
+            dominant_direction = self._bearing_to_compass(dominant_bearing)
+
+        # Country list with names (v2.3.0, enriched v2.5.0)
+        countries_list = sorted(
+            f"{c} ({get_dxcc_name(c)})" for c in countries
+        )
         unique_countries = len(countries)
 
         # DX ratio - percentage of spots > DX_THRESHOLD_KM (v2.3.0)
@@ -886,7 +990,9 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                 max_distance_km=max(band_distances) if band_distances else 0.0,
                 unique_countries=len(band_countries),
                 dominant_mode=band_dominant_mode,
-                countries_list=sorted(band_countries),
+                countries_list=sorted(
+                    f"{c} ({get_dxcc_name(c)})" for c in band_countries
+                ),
             )
 
         # Wanted list window tracking (v2.4.0)
@@ -918,6 +1024,11 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
             countries_list=countries_list,
             farthest_station=farthest_station,
             farthest_station_distance=round(farthest_station_distance, 1),
+            # Bearing/direction (v2.5.0)
+            dominant_bearing=dominant_bearing,
+            dominant_direction=dominant_direction,
+            farthest_station_bearing=farthest_station_bearing,
+            farthest_station_country=farthest_station_country,
             band_stats=band_stats,
             spots_last_hour=spots_last_hour,
             dx_ratio=round(dx_ratio, 1),

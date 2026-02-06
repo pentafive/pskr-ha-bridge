@@ -10,6 +10,8 @@ Usage:
     python generate_dashboard.py KD5QLM KJ5IUY             # Two callsigns (comparison)
     python generate_dashboard.py KD5QLM --no-global        # Without global monitor
     python generate_dashboard.py KD5QLM -o dashboard.yaml  # Save to file
+    python generate_dashboard.py --global-only             # Global monitor only
+    python generate_dashboard.py KD5QLM --no-views-wrapper # Without views: wrapper
 
 Requirements:
     - PSKReporter HACS integration v2.3.0+
@@ -18,6 +20,7 @@ Requirements:
 
 import argparse
 import sys
+import textwrap
 from pathlib import Path
 
 # Color scheme for consistent styling
@@ -119,12 +122,32 @@ def generate_badges(callsigns: list[str], include_global: bool) -> str:
     return "\n".join(badges)
 
 
+def wrap_views(yaml: str) -> str:
+    """Wrap dashboard YAML in views: array for HA Raw Configuration Editor."""
+    indented = textwrap.indent(yaml, "  ")
+    return f"views:\n  - {indented[4:]}"
+
+
 def generate_dashboard(
     callsigns: list[str],
     include_global: bool = True,
     include_bands: bool = True,
+    global_only: bool = False,
 ) -> str:
     """Generate complete dashboard YAML using templates."""
+
+    if global_only:
+        # Global-only mode: just global section + health
+        header_template = load_template("header")
+        header = substitute(
+            header_template,
+            CALLSIGNS="Global Monitor",
+            MAX_COLUMNS=1,
+        )
+        sections = [generate_global_section()]
+        sections_yaml = "\n".join(sections)
+        badges_yaml = generate_badges([], include_global=True)
+        return f"{header}{sections_yaml}\nbadges:\n{badges_yaml}\ncards: []\n"
 
     # Normalize callsigns
     callsigns = [c.upper() for c in callsigns]
@@ -177,7 +200,9 @@ Examples:
   %(prog)s W1ABC                     Single callsign dashboard
   %(prog)s W1ABC K2DEF               Two callsign comparison
   %(prog)s W1ABC --no-global         Without global monitor
+  %(prog)s --global-only             Global monitor only
   %(prog)s W1ABC -o my-dashboard.yaml  Save to file
+  %(prog)s W1ABC --no-views-wrapper  Without views: wrapper
 
 Requirements:
   - PSKReporter HACS integration v2.3.0+
@@ -186,8 +211,13 @@ Requirements:
     )
     parser.add_argument(
         "callsigns",
-        nargs="+",
+        nargs="*",
         help="Your callsign(s) - up to 2 for comparison view",
+    )
+    parser.add_argument(
+        "--global-only",
+        action="store_true",
+        help="Generate global monitor dashboard only (no callsign needed)",
     )
     parser.add_argument(
         "--no-global",
@@ -200,6 +230,17 @@ Requirements:
         help="Exclude per-band breakdown sections",
     )
     parser.add_argument(
+        "--views-wrapper",
+        action="store_true",
+        default=True,
+        help="Wrap output in views: array for Raw Configuration Editor (default)",
+    )
+    parser.add_argument(
+        "--no-views-wrapper",
+        action="store_true",
+        help="Output bare view definition without views: wrapper",
+    )
+    parser.add_argument(
         "-o", "--output",
         type=str,
         help="Output file (default: stdout)",
@@ -207,20 +248,29 @@ Requirements:
 
     args = parser.parse_args()
 
-    if len(args.callsigns) > 2:
+    if not args.global_only and not args.callsigns:
+        parser.error("callsigns are required unless --global-only is specified")
+
+    if args.callsigns and len(args.callsigns) > 2:
         print("Warning: Only first 2 callsigns will be used for optimal layout", file=sys.stderr)
         args.callsigns = args.callsigns[:2]
 
+    use_views_wrapper = not args.no_views_wrapper
+
     try:
         dashboard = generate_dashboard(
-            callsigns=args.callsigns,
+            callsigns=args.callsigns or [],
             include_global=not args.no_global,
             include_bands=not args.no_bands,
+            global_only=args.global_only,
         )
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)
         print("Make sure you're running from the dashboards directory or templates exist.", file=sys.stderr)
         sys.exit(1)
+
+    if use_views_wrapper:
+        dashboard = wrap_views(dashboard)
 
     if args.output:
         with open(args.output, "w") as f:

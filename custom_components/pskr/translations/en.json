@@ -152,6 +152,9 @@
       "farthest_station": {
         "name": "Farthest Station"
       },
+      "dominant_direction": {
+        "name": "Dominant Direction"
+      },
       "spots_last_hour": {
         "name": "Spots (1h)"
       },
