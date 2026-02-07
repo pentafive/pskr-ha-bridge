@@ -2,14 +2,8 @@
 
 Future enhancements for pskr-ha-bridge.
 
-## v2.6.x - Dashboard Generator Improvements
-
-- [ ] **Preset tiers** - Minimal | Standard | Full complexity options
-- [ ] **Minimal preset** - Fewer cards, simpler layout for basic monitoring
-
 ## v2.7.x - Advanced Features
 
-- [ ] **Activity heatmap data** - Hour × Band matrix as sensor attribute
 - [ ] **Contest mode** - Track unique multipliers for contest logging
 
 ## Future Considerations
@@ -21,6 +15,12 @@ Future enhancements for pskr-ha-bridge.
 - [ ] **Multi-rig support** - Track spots from multiple stations/antennas with unified dashboard
 
 ## Completed
+
+### v2.6.0
+- [x] Dashboard preset tiers — `--preset minimal|standard|full`
+- [x] Minimal preset — native HA cards only, no HACS frontend dependencies
+- [x] Activity heatmap — hour × band matrix as sensor attribute (24h rolling)
+- [x] Disconnect log rate-limiting v2 — timestamp-based, max 1 WARNING per 300s
 
 ### v2.5.0
 - [x] DXCC name mapping — human-readable country names in sensor attributes
@@ -56,4 +56,4 @@ Future enhancements for pskr-ha-bridge.
 
 ---
 
-*Last updated: 2026-02-06*
+*Last updated: 2026-02-07*

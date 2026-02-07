@@ -1,6 +1,6 @@
 [project]
 name = "pskr-ha-bridge"
-version = "2.5.1"
+version = "2.6.0"
 description = "Bridge amateur radio spot data from PSKReporter.info to Home Assistant"
 readme = "README.md"
 license = {text = "MIT"}
@@ -44,7 +44,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["ARG", "F841", "F401", "UP009", "I001"]
+"tests/*" = ["ARG", "F841", "F401", "UP009", "UP017", "I001"]
 # Legacy Docker bridge script - minimal lint enforcement until refactored
 "pskr-ha-bridge.py" = [
     "E701",   # Multiple statements on one line (colon)

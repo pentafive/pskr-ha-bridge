@@ -136,5 +136,9 @@ SENSOR_SPOTS_PER_MINUTE: Final = "spots_per_minute"
 # Event types (v2.4.0)
 EVENT_WANTED_SPOT: Final = "pskr_wanted_spot"
 
+# Activity heatmap (v2.6.0)
+SENSOR_ACTIVITY_HEATMAP: Final = "activity_heatmap"
+HEATMAP_WINDOW_HOURS: Final = 24
+
 # Attribution
 ATTRIBUTION: Final = "Data provided by PSKReporter.info"

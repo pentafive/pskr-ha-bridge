@@ -26,6 +26,8 @@ Monitor amateur radio digital mode propagation from [PSKReporter.info](https://p
 - **Rate Limiting** - Configurable message sampling for global monitoring
 - **Band Filtering** - Focus on specific bands (e.g., 20m, 40m, 6m)
 - **DXCC Wanted List** - Get alerts when specific DXCC/band combinations are spotted
+- **Activity Heatmap** - 24-hour rolling hour×band spot matrix for visualization
+- **Dashboard Presets** - Minimal, Standard, or Full dashboard complexity
 - **Two Deployment Options** - Native HACS integration or Docker/MQTT bridge
 
 ## Monitor Modes
@@ -109,6 +111,7 @@ For container deployment or MQTT-based integration:
 | **Per-Band** | {band} Max Distance | Farthest spot per band | km |
 | **Per-Band** | {band} Stations | Unique stations per band | stations |
 | **Per-Band** | {band} Countries | Unique countries per band | countries |
+| **Activity** | Activity Heatmap | 24h rolling hour×band spot matrix | spots |
 | **Connection** | Connection Status | MQTT connected | Connected/Disconnected |
 | **Health** | Feed Status | Data flowing | Healthy/Unhealthy |
 | **Health** | Message Rate | MQTT messages/min | msg/min |
@@ -118,7 +121,7 @@ For container deployment or MQTT-based integration:
 | **Health** | Sequence Gaps | Missed messages detected | count |
 | **Health** | Parse Errors | Malformed messages | count |
 
-**v2.5.0:** Personal mode now includes 79 sensors + 2 binary sensors (9 activity + 10 extended + 2 wanted + 7 health + 50 per-band + 1 feed health binary + 1 wanted match binary).
+**v2.6.0:** Personal mode now includes 80 sensors + 2 binary sensors (9 activity + 10 extended + 2 wanted + 1 heatmap + 7 health + 50 per-band + 1 feed health binary + 1 wanted match binary).
 
 ### Global Monitor Sensors
 
@@ -138,6 +141,7 @@ For container deployment or MQTT-based integration:
 | **Per-Band** | 12m Activity | 12m spot count | spots |
 | **Per-Band** | 10m Activity | 10m spot count | spots |
 | **Per-Band** | 6m Activity | 6m spot count | spots |
+| **Activity** | Activity Heatmap | 24h rolling hour×band matrix | spots |
 | **Health** | *(same as personal)* | | |
 
 ### Binary Sensors

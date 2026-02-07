@@ -20,7 +20,7 @@ from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import ATTRIBUTION, DOMAIN, HF_BANDS, MONITOR_GLOBAL
+from .const import ATTRIBUTION, DOMAIN, HEATMAP_WINDOW_HOURS, HF_BANDS, MONITOR_GLOBAL
 from .coordinator import BandStats, PSKReporterCoordinator, PSKReporterData
 
 
@@ -298,6 +298,23 @@ EXTENDED_SENSOR_DESCRIPTIONS: tuple[PSKReporterSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.wanted_list_size,
     ),
+    # Activity heatmap (v2.6.0)
+    PSKReporterSensorEntityDescription(
+        key="activity_heatmap",
+        translation_key="activity_heatmap",
+        native_unit_of_measurement="spots",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: sum(
+            sum(bands.values()) for bands in data.activity_heatmap.values()
+        ) if data.activity_heatmap else 0,
+        attr_fn=lambda data: {
+            "heatmap": {
+                str(h): bands for h, bands in data.activity_heatmap.items()
+            } if data.activity_heatmap else {},
+            "hours_utc": True,
+            "window_hours": HEATMAP_WINDOW_HOURS,
+        },
+    ),
 )
 
 # Global mode sensors (no callsign - PSKReporter-wide stats)
@@ -350,6 +367,23 @@ GLOBAL_SENSOR_DESCRIPTIONS: tuple[PSKReporterSensorEntityDescription, ...] = (
             "reconnect_count": data.health.reconnect_count,
             "last_disconnect_reason": data.health.last_disconnect_reason,
             "subscribed_topics": data.health.subscribed_topics,
+        },
+    ),
+    # Activity heatmap (v2.6.0)
+    PSKReporterSensorEntityDescription(
+        key="activity_heatmap",
+        translation_key="activity_heatmap",
+        native_unit_of_measurement="spots",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: sum(
+            sum(bands.values()) for bands in data.activity_heatmap.values()
+        ) if data.activity_heatmap else 0,
+        attr_fn=lambda data: {
+            "heatmap": {
+                str(h): bands for h, bands in data.activity_heatmap.items()
+            } if data.activity_heatmap else {},
+            "hours_utc": True,
+            "window_hours": HEATMAP_WINDOW_HOURS,
         },
     ),
 )
@@ -425,7 +459,7 @@ class PSKReporterSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity)
                 name="PSKReporter - Global Monitor",
                 manufacturer="PSKReporter.info",
                 model="PSKReporter HA Bridge (Global)",
-                sw_version="2.5.1",
+                sw_version="2.6.0",
                 configuration_url="https://pskreporter.info",
             )
         return DeviceInfo(
@@ -433,7 +467,7 @@ class PSKReporterSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEntity)
             name=f"PSKReporter - {self.coordinator.callsign}",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge",
-            sw_version="2.5.1",
+            sw_version="2.6.0",
             configuration_url="https://pskreporter.info",
         )
 
@@ -480,7 +514,7 @@ class PSKReporterBandSensor(CoordinatorEntity[PSKReporterCoordinator], SensorEnt
             name="PSKReporter - Global Monitor",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge (Global)",
-            sw_version="2.5.1",
+            sw_version="2.6.0",
             configuration_url="https://pskreporter.info",
         )
 
@@ -582,7 +616,7 @@ class PSKReporterPersonalBandSensor(CoordinatorEntity[PSKReporterCoordinator], S
             name=f"PSKReporter - {self.coordinator.callsign}",
             manufacturer="PSKReporter.info",
             model="PSKReporter HA Bridge",
-            sw_version="2.5.1",
+            sw_version="2.6.0",
             configuration_url="https://pskreporter.info",
         )
 

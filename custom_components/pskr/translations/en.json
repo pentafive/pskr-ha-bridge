@@ -184,6 +184,9 @@
       },
       "band_unique_countries": {
         "name": "{band} Countries"
+      },
+      "activity_heatmap": {
+        "name": "Activity Heatmap"
       }
     },
     "binary_sensor": {

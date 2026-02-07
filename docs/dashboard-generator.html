@@ -55,9 +55,19 @@
             font-size: 16px;
             text-transform: uppercase;
         }
-        input[type="text"]:focus {
+        input[type="text"]:focus, select:focus {
             outline: none;
             border-color: var(--highlight);
+        }
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--accent);
+            border-radius: 8px;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 16px;
+            cursor: pointer;
         }
         .checkbox-group {
             display: flex;
@@ -177,10 +187,18 @@
 <body>
     <div class="container">
         <h1>📡 PSKReporter Dashboard Generator</h1>
-        <p class="subtitle">Generate a Home Assistant dashboard for your amateur radio station <span class="badge">v2.5.0+</span></p>
+        <p class="subtitle">Generate a Home Assistant dashboard for your amateur radio station <span class="badge">v2.6.0+</span></p>
 
         <div class="card">
-            <div class="checkbox-group" style="margin-bottom: 16px;">
+            <label for="presetSelect">Dashboard Preset</label>
+            <select id="presetSelect" onchange="togglePreset()">
+                <option value="minimal">Minimal — Native HA cards only (no HACS frontend cards)</option>
+                <option value="standard" selected>Standard — Mushroom + mini-graph-card</option>
+                <option value="full">Full — Standard + per-band + comparison + heatmap</option>
+            </select>
+            <p class="help" id="presetHelp">Rich interactive dashboard with graphs and mushroom cards</p>
+
+            <div class="checkbox-group" style="margin-top: 16px; margin-bottom: 16px;">
                 <label>
                     <input type="radio" name="monitorType" id="typePersonal" value="personal" checked onchange="toggleMonitorType()">
                     Personal + Global
@@ -246,10 +264,10 @@
         <div class="card">
             <h3>Requirements</h3>
             <ul>
-                <li><a href="https://github.com/pentafive/pskr-ha-bridge" target="_blank">PSKReporter HACS Integration</a> v2.3.0+</li>
-                <li><a href="https://github.com/piitaya/lovelace-mushroom" target="_blank">Mushroom Cards</a> (HACS Frontend)</li>
-                <li><a href="https://github.com/kalkih/mini-graph-card" target="_blank">Mini Graph Card</a> (HACS Frontend)</li>
-                <li><a href="https://github.com/RomRider/apexcharts-card" target="_blank">ApexCharts Card</a> (HACS Frontend) - for comparison charts</li>
+                <li><a href="https://github.com/pentafive/pskr-ha-bridge" target="_blank">PSKReporter HACS Integration</a> v2.6.0+</li>
+                <li><strong>Minimal preset:</strong> No HACS frontend cards required</li>
+                <li><strong>Standard preset:</strong> <a href="https://github.com/piitaya/lovelace-mushroom" target="_blank">Mushroom Cards</a> + <a href="https://github.com/kalkih/mini-graph-card" target="_blank">Mini Graph Card</a></li>
+                <li><strong>Full preset:</strong> Standard + <a href="https://github.com/RomRider/apexcharts-card" target="_blank">ApexCharts Card</a></li>
             </ul>
         </div>
     </div>
@@ -260,6 +278,40 @@
 
         // Template cache
         const templates = {};
+
+        const PRESET_CONFIG = {
+            minimal: {
+                template: 'minimal-section',
+                includeBands: false,
+                includeComparison: false,
+                help: 'Basic monitoring with native HA entity cards — no HACS frontend cards needed',
+                requirements: 'No HACS frontend cards required'
+            },
+            standard: {
+                template: 'callsign-section',
+                includeBands: false,
+                includeComparison: false,
+                help: 'Rich interactive dashboard with graphs and mushroom cards',
+                requirements: 'mushroom, mini-graph-card'
+            },
+            full: {
+                template: 'callsign-section',
+                includeBands: true,
+                includeComparison: true,
+                help: 'Everything: per-band breakdown, comparison charts, and activity heatmap',
+                requirements: 'mushroom, mini-graph-card, apexcharts-card'
+            }
+        };
+
+        function togglePreset() {
+            const preset = document.getElementById('presetSelect').value;
+            const config = PRESET_CONFIG[preset];
+            document.getElementById('presetHelp').textContent = config.help;
+
+            // Show/hide bands checkbox based on preset
+            const bandsCheck = document.getElementById('includeBands');
+            bandsCheck.checked = config.includeBands;
+        }
 
         function toggleMonitorType() {
             const isGlobal = document.getElementById('typeGlobalOnly').checked;
@@ -296,8 +348,9 @@
             return result;
         }
 
-        async function generateCallsignSection(callsign, color) {
-            const template = await loadTemplate('callsign-section');
+        async function generateCallsignSection(callsign, color, templateName) {
+            templateName = templateName || 'callsign-section';
+            const template = await loadTemplate(templateName);
             return substitute(template, {
                 CALLSIGN: callsign.toUpperCase(),
                 CALL_LOWER: callsign.toLowerCase(),
@@ -366,6 +419,8 @@
             const errorMsg = document.getElementById('errorMsg');
             errorMsg.style.display = 'none';
 
+            const preset = document.getElementById('presetSelect').value;
+            const presetConfig = PRESET_CONFIG[preset];
             const isGlobalOnly = document.getElementById('typeGlobalOnly').checked;
             const call1 = document.getElementById('callsign1').value.trim().toUpperCase();
             const call2 = document.getElementById('callsign2').value.trim().toUpperCase();
@@ -406,9 +461,10 @@
                     });
 
                     const sections = [];
+                    const sectionTemplate = presetConfig.template;
 
                     for (let i = 0; i < callsigns.length; i++) {
-                        sections.push(await generateCallsignSection(callsigns[i], COLORS[i % COLORS.length]));
+                        sections.push(await generateCallsignSection(callsigns[i], COLORS[i % COLORS.length], sectionTemplate));
                     }
 
                     if (includeGlobal) {
@@ -421,7 +477,7 @@
                         }
                     }
 
-                    if (callsigns.length > 1) {
+                    if (callsigns.length > 1 && presetConfig.includeComparison) {
                         sections.push(await generateComparisonSection(callsigns));
                     }
 
@@ -499,6 +555,21 @@ sections:
         secondary: "{{ states('sensor.pskreporter_global_monitor_global_spots') }}"
         icon: mdi:earth
         icon_color: "#9c27b0"
+    column_span: 1`,
+                'minimal-section': `  - cards:
+      - type: heading
+        heading: \${CALLSIGN}
+        heading_style: title
+      - type: entities
+        entities:
+          - entity: sensor.pskreporter_\${CALL_LOWER}_total_spots
+            name: Total Spots
+          - entity: sensor.pskreporter_\${CALL_LOWER}_most_active_band
+            name: Most Active Band
+          - entity: sensor.pskreporter_\${CALL_LOWER}_connection_status
+            name: Connection
+          - entity: sensor.pskreporter_\${CALL_LOWER}_last_spot
+            name: Last Spot
     column_span: 1`,
                 'comparison-section': `  - cards:
       - type: custom:apexcharts-card

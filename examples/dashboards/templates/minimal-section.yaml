@@ -1,0 +1,36 @@
+  - cards:
+      - type: heading
+        heading: ${CALLSIGN}
+        heading_style: title
+      - type: entities
+        entities:
+          - entity: sensor.pskreporter_${CALL_LOWER}_total_spots
+            name: Total Spots
+          - entity: sensor.pskreporter_${CALL_LOWER}_most_active_band
+            name: Most Active Band
+          - entity: sensor.pskreporter_${CALL_LOWER}_connection_status
+            name: Connection
+          - entity: sensor.pskreporter_${CALL_LOWER}_last_spot
+            name: Last Spot
+      - type: entity
+        entity: sensor.pskreporter_${CALL_LOWER}_total_spots
+        name: Total Spots
+      - type: horizontal-stack
+        cards:
+          - type: entity
+            entity: sensor.pskreporter_${CALL_LOWER}_unique_stations
+            name: Stations
+          - type: entity
+            entity: sensor.pskreporter_${CALL_LOWER}_most_active_band
+            name: Top Band
+      - type: horizontal-stack
+        cards:
+          - type: entity
+            entity: sensor.pskreporter_${CALL_LOWER}_connection_status
+            name: Connection
+            icon: mdi:connection
+          - type: entity
+            entity: sensor.pskreporter_${CALL_LOWER}_feed_status
+            name: Feed
+            icon: mdi:heart-pulse
+    column_span: 1

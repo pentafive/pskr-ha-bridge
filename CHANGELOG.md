@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-02-07
+
+### Added
+- **Activity Heatmap** - Rolling 24-hour activity matrix (hour x band) as sensor attribute for visualization
+  - New `activity_heatmap` sensor (personal + global) — state is total 24h spots, attribute contains full 24x10 matrix
+  - Counts ALL messages (unaffected by sample rate) for accurate activity representation
+- **Dashboard Generator Presets** - `--preset minimal|standard|full` for different complexity levels
+  - Minimal: Native HA cards only (no HACS frontend dependencies)
+  - Standard: Existing behavior (mushroom + mini-graph-card)
+  - Full: Standard + per-band breakdowns and comparison charts
+  - Web UI preset dropdown with auto-configuration
+
+### Fixed
+- **Disconnect Log Spam (v2)** - Replaced v2.5.0 boolean flag with timestamp-based rate limiting (max 1 WARNING per 300 seconds during extended outages, with disconnect count summary)
+  - v2.5.0 fix reset the flag on every reconnect — production logs showed 2,348 warnings in 5.5 hours during unstable connections
+  - Reconnection INFO logs demoted to DEBUG when connection was unstable (<30s since last warning)
+  - Docker bridge: same rate-limiting applied to both PSKReporter and HA broker disconnects
+
+### Changed
+- Sensor count: Personal mode 79 → 80 sensors (+1 `activity_heatmap`)
+- Global mode 22 → 23 sensors (+1 `activity_heatmap`)
+
+### Technical
+- `_disconnect_warn_time`/`_disconnect_count`/`_stable_connect_time` replace `_disconnect_logged` boolean
+- `_hourly_counts` dict with `defaultdict(int)` per hour-band bucket, pruned to 24h window
+- `_build_activity_heatmap()` produces full 24x10 matrix with all hours (0-23) and all HF_BANDS
+- Dashboard `PRESETS` dict controls template, bands, comparison per tier
+- New `minimal-section.yaml` template with native HA entity cards
+
+---
+
 ## [2.5.1] - 2026-02-06
 
 ### Fixed

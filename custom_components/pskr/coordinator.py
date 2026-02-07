@@ -48,6 +48,7 @@ from .const import (
     FEED_HEALTHY_THRESHOLD_PERSONAL,
     FEED_LOW_ACTIVITY_THRESHOLD,
     GLOBAL_TOPICS,
+    HEATMAP_WINDOW_HOURS,
     HF_BANDS,
     MONITOR_GLOBAL,
     MONITOR_PERSONAL,
@@ -192,6 +193,9 @@ class PSKReporterData:
     wanted_match_count: int = 0
     wanted_list_size: int = 0
 
+    # Activity heatmap (v2.6.0) — hour (0-23) → band → count
+    activity_heatmap: dict[int, dict[str, int]] = field(default_factory=dict)
+
 
 class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
     """Coordinator for PSKReporter data."""
@@ -254,7 +258,12 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         self._startup_time = time.time()
         self._message_counter = 0  # For rate limiting
         self._processed_messages = 0  # Processed after rate limiting
-        self._disconnect_logged = False  # Rate-limit disconnect warnings
+        self._disconnect_warn_time: float = 0  # Timestamp of last WARNING-level disconnect log
+        self._disconnect_count: int = 0  # Disconnects since last WARNING
+        self._stable_connect_time: float = 0  # When connection became "stable" (>60s connected)
+
+        # Activity heatmap counters (v2.6.0): "YYYY-MM-DD-HH" → {band: count}
+        self._hourly_counts: dict[str, dict[str, int]] = {}
 
         # Global mode aggregation (count-only, no spot storage)
         self._global_band_counts: dict[str, int] = defaultdict(int)
@@ -286,7 +295,13 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
 
     def _setup_and_connect_mqtt(self) -> None:
         """Set up and connect MQTT client (blocking, runs in executor)."""
-        client_id = f"ha_pskr_{self._callsign}" if self._callsign else "ha_pskr_global"
+        # Structured client_id: project, monitor target, unique install suffix
+        # e.g. pskr-ha-bridge_KD5QLM-rx_01KGV9AK or pskr-ha-bridge_global_01KGV9AK
+        entry_suffix = self.config_entry.entry_id[:8]
+        if self._callsign:
+            client_id = f"pskr-ha-bridge_{self._callsign}-{self._direction}_{entry_suffix}"
+        else:
+            client_id = f"pskr-ha-bridge_global_{entry_suffix}"
 
         # Use configured transport (v2.2.0)
         transport = self._transport_config["transport"]
@@ -341,15 +356,24 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         """Handle MQTT connection."""
         if reason_code == 0:
             self._connected = True
-            self._health.connected_at = time.time()
+            now = time.time()
+            self._health.connected_at = now
+            self._stable_connect_time = now
             if self._health.reconnect_count > 0:
-                _LOGGER.info(
-                    "Reconnected to PSKReporter MQTT (after %d disconnects)",
-                    self._health.reconnect_count,
-                )
+                # Only log reconnection at INFO if previous connection lasted >30s
+                time_since_warn = now - self._disconnect_warn_time if self._disconnect_warn_time > 0 else 999
+                if time_since_warn > 30:
+                    _LOGGER.info(
+                        "Reconnected to PSKReporter MQTT (after %d disconnects)",
+                        self._health.reconnect_count,
+                    )
+                else:
+                    _LOGGER.debug(
+                        "Reconnected to PSKReporter MQTT (after %d disconnects)",
+                        self._health.reconnect_count,
+                    )
             else:
                 _LOGGER.info("Connected to PSKReporter MQTT")
-            self._disconnect_logged = False
             self._subscribe_topics()
         else:
             _LOGGER.error("MQTT connection failed: %s", reason_code)
@@ -365,11 +389,23 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         """Handle MQTT disconnection."""
         self._connected = False
         self._health.reconnect_count += 1
+        self._disconnect_count += 1
+        now = time.time()
         reason_str = self._format_disconnect_reason(reason_code)
         self._health.last_disconnect_reason = reason_str
-        if not self._disconnect_logged:
-            _LOGGER.warning("Disconnected from PSKReporter MQTT: %s", reason_str)
-            self._disconnect_logged = True
+
+        # Rate-limit WARNING: first disconnect always warns, then max 1 per 300s
+        time_since_warn = now - self._disconnect_warn_time if self._disconnect_warn_time > 0 else 999
+        if time_since_warn >= 300:
+            if self._disconnect_count > 1:
+                _LOGGER.warning(
+                    "Disconnected from PSKReporter MQTT: %s (%d disconnects in last %ds)",
+                    reason_str, self._disconnect_count, int(time_since_warn),
+                )
+            else:
+                _LOGGER.warning("Disconnected from PSKReporter MQTT: %s", reason_str)
+            self._disconnect_warn_time = now
+            self._disconnect_count = 0
         else:
             _LOGGER.debug("Disconnected from PSKReporter MQTT: %s", reason_str)
 
@@ -464,6 +500,26 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         self._message_times.append(now)
         self._message_counter += 1
 
+        # Parse payload early — needed for heatmap counting before rate-limiting
+        try:
+            payload = json.loads(msg.payload.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self._health.parse_errors += 1
+            _LOGGER.debug("Failed to parse MQTT message: %s", msg.payload)
+            return
+
+        # Activity heatmap: count ALL messages regardless of sampling (v2.6.0)
+        heatmap_band = payload.get("b", "")
+        if heatmap_band:
+            from datetime import UTC
+            from datetime import datetime as _dt
+
+            utc_now = _dt.now(UTC)
+            hour_key = utc_now.strftime("%Y-%m-%d-%H")
+            if hour_key not in self._hourly_counts:
+                self._hourly_counts[hour_key] = defaultdict(int)
+            self._hourly_counts[hour_key][heatmap_band] += 1
+
         # Rate limiting: skip messages based on sample rate
         if self._sample_rate > 1 and self._message_counter % self._sample_rate != 0:
             return
@@ -471,8 +527,6 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
         self._processed_messages += 1
 
         try:
-            payload = json.loads(msg.payload.decode("utf-8"))
-
             # Track sequence gaps (only meaningful for non-sampled messages)
             if self._sample_rate == 1 and "sq" in payload:
                 seq = int(payload["sq"])
@@ -504,9 +558,6 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                 asyncio.run_coroutine_threadsafe(
                     self.async_request_refresh(), self.hass.loop
                 )
-        except json.JSONDecodeError:
-            self._health.parse_errors += 1
-            _LOGGER.debug("Failed to parse MQTT message: %s", msg.payload)
         except Exception as err:
             self._health.parse_errors += 1
             _LOGGER.debug("Error processing spot: %s", err)
@@ -789,9 +840,41 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
             self._global_unique_stations.clear()
             self._last_window_reset = now
 
+    def _build_activity_heatmap(self) -> dict[int, dict[str, int]]:
+        """Build 24h activity heatmap and prune old entries (v2.6.0)."""
+        from datetime import UTC
+        from datetime import datetime as _dt
+        from datetime import timedelta as _td
+
+        utc_now = _dt.now(UTC)
+        cutoff = utc_now - _td(hours=HEATMAP_WINDOW_HOURS)
+
+        # Prune entries older than 24h
+        stale_keys = [
+            k for k in self._hourly_counts
+            if _dt.strptime(k, "%Y-%m-%d-%H").replace(tzinfo=UTC) < cutoff
+        ]
+        for k in stale_keys:
+            del self._hourly_counts[k]
+
+        # Build output: all 24 hours (0-23), all HF_BANDS per hour (0 if no spots)
+        heatmap: dict[int, dict[str, int]] = {}
+        for hour in range(24):
+            heatmap[hour] = dict.fromkeys(HF_BANDS, 0)
+
+        # Aggregate counts into hour-of-day buckets
+        for key, band_counts in self._hourly_counts.items():
+            hour = int(key.split("-")[-1])
+            for band, count in band_counts.items():
+                if band in heatmap[hour]:
+                    heatmap[hour][band] += count
+
+        return heatmap
+
     def _calculate_statistics(self) -> PSKReporterData:
         """Calculate statistics from current spots."""
         health = self._calculate_health_metrics()
+        activity_heatmap = self._build_activity_heatmap()
 
         # Global mode or count-only: use aggregated counters
         if self._monitor_type == MONITOR_GLOBAL or self._count_only:
@@ -821,6 +904,7 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                 processed_messages=self._processed_messages,
                 global_unique_stations=len(self._global_unique_stations),
                 wanted_list_size=len(self._wanted_set),
+                activity_heatmap=activity_heatmap,
             )
 
         # Personal mode with spot storage
@@ -832,6 +916,7 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                 health=health,
                 monitor_type=self._monitor_type,
                 wanted_list_size=len(self._wanted_set),
+                activity_heatmap=activity_heatmap,
             )
 
         stats_cutoff = time.time() - self._stats_window
@@ -845,6 +930,7 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
                 health=health,
                 monitor_type=self._monitor_type,
                 wanted_list_size=len(self._wanted_set),
+                activity_heatmap=activity_heatmap,
             )
 
         unique_stations: set[str] = set()
@@ -1037,6 +1123,8 @@ class PSKReporterCoordinator(DataUpdateCoordinator[PSKReporterData]):
             wanted_match=wanted_in_window > 0,
             wanted_match_count=wanted_in_window,
             wanted_list_size=len(self._wanted_set),
+            # Activity heatmap (v2.6.0)
+            activity_heatmap=activity_heatmap,
         )
 
     async def _async_update_data(self) -> PSKReporterData:

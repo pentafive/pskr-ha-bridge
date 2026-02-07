@@ -6,16 +6,25 @@ Generates a customized Lovelace dashboard YAML for your callsign(s).
 Uses template files from ./templates/ directory.
 
 Usage:
-    python generate_dashboard.py KD5QLM                    # Single callsign
+    python generate_dashboard.py KD5QLM                    # Single callsign (standard preset)
+    python generate_dashboard.py KD5QLM --preset minimal   # Minimal (native HA cards only)
+    python generate_dashboard.py KD5QLM --preset full      # Full with heatmap + bands + comparison
     python generate_dashboard.py KD5QLM KJ5IUY             # Two callsigns (comparison)
     python generate_dashboard.py KD5QLM --no-global        # Without global monitor
     python generate_dashboard.py KD5QLM -o dashboard.yaml  # Save to file
     python generate_dashboard.py --global-only             # Global monitor only
     python generate_dashboard.py KD5QLM --no-views-wrapper # Without views: wrapper
 
+Presets:
+    minimal  - Basic monitoring with native HA cards only (no HACS frontend cards)
+    standard - Full dashboard with mushroom + mini-graph-card (default)
+    full     - Standard + per-band breakdown + comparison + activity heatmap
+
 Requirements:
-    - PSKReporter HACS integration v2.3.0+
-    - HACS Frontend cards: mushroom, mini-graph-card, apexcharts-card (optional)
+    - PSKReporter HACS integration v2.6.0+
+    - minimal: No HACS frontend cards required
+    - standard: mushroom, mini-graph-card
+    - full: mushroom, mini-graph-card, apexcharts-card
 """
 
 import argparse
@@ -25,6 +34,34 @@ from pathlib import Path
 
 # Color scheme for consistent styling
 COLORS = ["#1E88E5", "#FFA726", "#43A047", "#E53935"]
+
+# Preset definitions
+PRESETS = {
+    "minimal": {
+        "description": "Basic monitoring (native HA cards only)",
+        "section_template": "minimal-section",
+        "include_bands": False,
+        "include_comparison": False,
+        "include_global": True,
+        "requirements": "No HACS frontend cards required",
+    },
+    "standard": {
+        "description": "Full dashboard (mushroom + mini-graph-card)",
+        "section_template": "callsign-section",
+        "include_bands": False,
+        "include_comparison": False,
+        "include_global": True,
+        "requirements": "mushroom, mini-graph-card",
+    },
+    "full": {
+        "description": "Everything + per-band + comparison + heatmap",
+        "section_template": "callsign-section",
+        "include_bands": True,
+        "include_comparison": True,
+        "include_global": True,
+        "requirements": "mushroom, mini-graph-card, apexcharts-card",
+    },
+}
 
 # Template directory (relative to this script)
 TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -46,9 +83,9 @@ def substitute(template: str, **kwargs) -> str:
     return result
 
 
-def generate_callsign_section(callsign: str, color: str) -> str:
+def generate_callsign_section(callsign: str, color: str, template_name: str = "callsign-section") -> str:
     """Generate a complete section for one callsign using template."""
-    template = load_template("callsign-section")
+    template = load_template(template_name)
     return substitute(
         template,
         CALLSIGN=callsign.upper(),
@@ -133,8 +170,10 @@ def generate_dashboard(
     include_global: bool = True,
     include_bands: bool = True,
     global_only: bool = False,
+    preset: str = "standard",
 ) -> str:
     """Generate complete dashboard YAML using templates."""
+    preset_config = PRESETS.get(preset, PRESETS["standard"])
 
     if global_only:
         # Global-only mode: just global section + health
@@ -156,6 +195,9 @@ def generate_dashboard(
     num_cols = len(callsigns) + (1 if include_global else 0)
     num_cols = min(num_cols, 3)  # Max 3 columns
 
+    # Determine requirements comment based on preset
+    requirements = preset_config["requirements"]
+
     # Build header
     header_template = load_template("header")
     header = substitute(
@@ -163,25 +205,34 @@ def generate_dashboard(
         CALLSIGNS=", ".join(callsigns),
         MAX_COLUMNS=num_cols,
     )
+    # Add preset info to header comment
+    header = header.replace(
+        "# Requires: PSKReporter HACS v2.3.0+, mushroom, mini-graph-card, apexcharts-card",
+        f"# Preset: {preset} — Requires: PSKReporter HACS v2.6.0+, {requirements}",
+    )
 
     sections = []
 
-    # Add callsign sections
+    # Add callsign sections (template varies by preset)
+    section_template = preset_config["section_template"]
     for i, callsign in enumerate(callsigns):
         color = COLORS[i % len(COLORS)]
-        sections.append(generate_callsign_section(callsign, color))
+        sections.append(generate_callsign_section(callsign, color, section_template))
 
     # Add global section
     if include_global:
         sections.append(generate_global_section())
 
-    # Add band breakdowns
-    if include_bands:
+    # Add band breakdowns (preset default, overridable by --no-bands)
+    use_bands = preset_config["include_bands"] if include_bands else False
+
+    if use_bands:
         for callsign in callsigns:
             sections.append(generate_band_breakdown(callsign))
 
-    # Add comparison section if multiple callsigns
-    if len(callsigns) > 1:
+    # Add comparison section if multiple callsigns and preset supports it
+    use_comparison = preset_config["include_comparison"]
+    if len(callsigns) > 1 and use_comparison:
         sections.append(generate_comparison_section(callsigns))
 
     # Combine all parts
@@ -197,22 +248,31 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s W1ABC                     Single callsign dashboard
-  %(prog)s W1ABC K2DEF               Two callsign comparison
-  %(prog)s W1ABC --no-global         Without global monitor
-  %(prog)s --global-only             Global monitor only
+  %(prog)s W1ABC                       Single callsign (standard preset)
+  %(prog)s W1ABC --preset minimal      Minimal dashboard (native HA cards only)
+  %(prog)s W1ABC --preset full         Full dashboard with bands + heatmap
+  %(prog)s W1ABC K2DEF                 Two callsign comparison
+  %(prog)s W1ABC --no-global           Without global monitor
+  %(prog)s --global-only               Global monitor only
   %(prog)s W1ABC -o my-dashboard.yaml  Save to file
-  %(prog)s W1ABC --no-views-wrapper  Without views: wrapper
+  %(prog)s W1ABC --no-views-wrapper    Without views: wrapper
 
-Requirements:
-  - PSKReporter HACS integration v2.3.0+
-  - HACS Frontend: mushroom, mini-graph-card, apexcharts-card
+Presets:
+  minimal   No HACS frontend cards required — basic entity cards
+  standard  Mushroom + mini-graph-card — rich interactive dashboard (default)
+  full      Standard + per-band breakdown + comparison charts + heatmap
         """,
     )
     parser.add_argument(
         "callsigns",
         nargs="*",
         help="Your callsign(s) - up to 2 for comparison view",
+    )
+    parser.add_argument(
+        "--preset",
+        choices=["minimal", "standard", "full"],
+        default="standard",
+        help="Dashboard preset (default: standard)",
     )
     parser.add_argument(
         "--global-only",
@@ -263,6 +323,7 @@ Requirements:
             include_global=not args.no_global,
             include_bands=not args.no_bands,
             global_only=args.global_only,
+            preset=args.preset,
         )
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)

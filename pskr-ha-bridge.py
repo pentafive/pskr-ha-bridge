@@ -103,9 +103,11 @@ wanted_match_times = []
 spot_session_stats = {}
 all_spots_history = deque(maxlen=MAX_SPOT_HISTORY)
 
-# --- Disconnect log rate-limiting ---
-psk_disconnect_logged = False
-ha_disconnect_logged = False
+# --- Disconnect log rate-limiting (v2.6.0: timestamp-based, max 1 WARNING per 300s) ---
+psk_disconnect_warn_time = 0
+psk_disconnect_count = 0
+ha_disconnect_warn_time = 0
+ha_disconnect_count = 0
 
 # --- Initialization for PyHamtools Lookups ---
 # (Initialization code remains the same)
@@ -485,9 +487,7 @@ def update_band_stats_task():
 
 # --- MQTT Callbacks ---
 def on_connect_psk(client, userdata, flags, rc, properties=None):
-    global psk_disconnect_logged
     if rc == 0:
-        psk_disconnect_logged = False
         print(f"INFO: Connected successfully to PSK Reporter Broker ({PSK_BROKER}). Mode: {SCRIPT_DIRECTION.upper()}")
         topics_to_subscribe = []
         topic_base = "pskr/filter/v2/+/{mode}/{sender}/{receiver}/#"
@@ -507,9 +507,7 @@ def on_connect_psk(client, userdata, flags, rc, properties=None):
     else: print(f"ERROR: Connection to PSK Reporter failed with code {rc}.")
 
 def on_connect_ha(client, userdata, flags, rc, properties=None):
-    global ha_disconnect_logged
     if rc == 0:
-        ha_disconnect_logged = False
         print(f"INFO: Connected successfully to Home Assistant Broker ({HA_MQTT_BROKER}).")
         print("INFO: Re-publishing discovery for known Spot sensors...")
         with state_lock: spot_keys_snapshot = list(spot_session_stats.keys())
@@ -522,20 +520,36 @@ def on_connect_ha(client, userdata, flags, rc, properties=None):
     else: print(f"ERROR: Connection to Home Assistant Broker failed with code {rc}.")
 
 def on_disconnect(client, userdata, flags, rc, properties=None):
-     global psk_disconnect_logged, ha_disconnect_logged
+     global psk_disconnect_warn_time, psk_disconnect_count, ha_disconnect_warn_time, ha_disconnect_count
      broker_name = "Unknown"; client_id = "?"
      if hasattr(client, '_client_id'): client_id = client._client_id.decode()
      is_psk = client == psk_client
      if is_psk: broker_name = "PSK Reporter"
      elif client == ha_client: broker_name = "Home Assistant"
      if rc != 0:
-         already_logged = (psk_disconnect_logged if is_psk else ha_disconnect_logged)
-         if not already_logged:
-             print(f"WARNING: Unexpected disconnection from {broker_name} Broker ({client_id})! Result code: {rc}. Will attempt to reconnect.")
-             if is_psk: psk_disconnect_logged = True
-             else: ha_disconnect_logged = True
-         elif DEBUG_MODE:
-             print(f"DEBUG: Repeated disconnect from {broker_name} (rc={rc})")
+         now = time.time()
+         if is_psk:
+             psk_disconnect_count += 1
+             time_since_warn = now - psk_disconnect_warn_time if psk_disconnect_warn_time > 0 else 999
+             if time_since_warn >= 300:
+                 if psk_disconnect_count > 1:
+                     print(f"WARNING: Disconnected from {broker_name} Broker ({client_id}), rc={rc} ({psk_disconnect_count} disconnects in last {int(time_since_warn)}s)")
+                 else:
+                     print(f"WARNING: Unexpected disconnection from {broker_name} Broker ({client_id})! Result code: {rc}. Will attempt to reconnect.")
+                 psk_disconnect_warn_time = now; psk_disconnect_count = 0
+             elif DEBUG_MODE:
+                 print(f"DEBUG: Repeated disconnect from {broker_name} (rc={rc})")
+         else:
+             ha_disconnect_count += 1
+             time_since_warn = now - ha_disconnect_warn_time if ha_disconnect_warn_time > 0 else 999
+             if time_since_warn >= 300:
+                 if ha_disconnect_count > 1:
+                     print(f"WARNING: Disconnected from {broker_name} Broker ({client_id}), rc={rc} ({ha_disconnect_count} disconnects in last {int(time_since_warn)}s)")
+                 else:
+                     print(f"WARNING: Unexpected disconnection from {broker_name} Broker ({client_id})! Result code: {rc}. Will attempt to reconnect.")
+                 ha_disconnect_warn_time = now; ha_disconnect_count = 0
+             elif DEBUG_MODE:
+                 print(f"DEBUG: Repeated disconnect from {broker_name} (rc={rc})")
      else: print(f"INFO: Disconnected from {broker_name} Broker ({client_id}) normally.")
 
 # --- on_message_psk ---
