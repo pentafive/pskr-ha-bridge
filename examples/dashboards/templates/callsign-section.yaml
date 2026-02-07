@@ -163,7 +163,7 @@
             cards:
               - type: custom:mushroom-template-card
                 primary: Max Distance
-                secondary: "{{ states('sensor.pskreporter_${CALL_LOWER}_maximum_distance') | round(0) }} mi"
+                secondary: "{{ states('sensor.pskreporter_${CALL_LOWER}_maximum_distance') | float(0) | round(0) | int }} mi"
                 icon: mdi:map-marker-distance
                 layout: horizontal
                 icon_color: "#e91e63"
@@ -188,7 +188,7 @@
         primary: Farthest Station
         secondary: >-
           {{ states('sensor.pskreporter_${CALL_LOWER}_farthest_station') }}
-          ({{ state_attr('sensor.pskreporter_${CALL_LOWER}_farthest_station', 'distance_km') | round(0) }} km)
+          ({{ state_attr('sensor.pskreporter_${CALL_LOWER}_farthest_station', 'distance_km') | float(0) | round(0) | int }} km)
         icon: mdi:antenna
         layout: horizontal
         entity: sensor.pskreporter_${CALL_LOWER}_farthest_station
